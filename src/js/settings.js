@@ -115,24 +115,23 @@ function populateFormFromConfig(config) {
   setNumber("bonusBothTeamsRanked", config.BONUS_WEIGHTS.bothTeamsRanked);
   setNumber("bonusCloseGame", config.BONUS_WEIGHTS.closeGame);
   setNumber("bonusCloseLateGame", config.BONUS_WEIGHTS.closeLateGame);
-  setNumber("bonusUpcomingNearTipoff", config.BONUS_WEIGHTS.upcomingRankedNearTipoff);
 
   setNumber("penaltyFinalGame", config.PENALTY_WEIGHTS.finalGame);
   setNumber("penaltyLiveBlowout", config.PENALTY_WEIGHTS.liveBlowout);
   setNumber("penaltyLiveLowInterest", config.PENALTY_WEIGHTS.liveLowInterest);
-  setNumber("penaltyUpcomingTooEarly", config.PENALTY_WEIGHTS.upcomingTooEarly);
 
   setNumber("closeMargin", config.CLOSE_GAME_RULES.closeMargin);
   setNumber("blowoutMargin", config.BLOWOUT_RULES.blowoutMargin);
-  setNumber("nearTipoffMinutes", config.UPCOMING_RULES.nearTipoffMinutes);
+  setChecked("upcomingTipoffProximityEnabled", config.UPCOMING_TIPOFF_PROXIMITY.enabled);
+  setNumber(
+    "upcomingTipoffHorizonMinutes",
+    config.UPCOMING_TIPOFF_PROXIMITY.horizonMinutes
+  );
+  setNumber("upcomingTipoffMaxBonus", config.UPCOMING_TIPOFF_PROXIMITY.maxBonus);
 
   setChecked("finalHoldEnabled", config.FINAL_HOLD.enabled);
   setNumber("finalHoldMinutes", config.FINAL_HOLD.holdMinutes);
   setNumber("finalHoldMaxBonus", config.FINAL_HOLD.maxBonus);
-
-  setChecked("rankStrengthEnabled", config.RANK_STRENGTH.enabled);
-  setNumber("rankBestRank", config.RANK_STRENGTH.bestRank);
-  setNumber("rankPointsPerSpot", config.RANK_STRENGTH.pointsPerSpot);
 
   setChecked("progressBoostEnabled", config.PROGRESS_BOOST.enabled);
   setNumber("progressSecondHalfBonus", config.PROGRESS_BOOST.secondHalfBonus);
@@ -202,10 +201,6 @@ function buildOverridesFromForm() {
         integer: true,
         fallback: resolvedConfig.BONUS_WEIGHTS.closeLateGame,
       }),
-      upcomingRankedNearTipoff: readNumber("bonusUpcomingNearTipoff", {
-        integer: true,
-        fallback: resolvedConfig.BONUS_WEIGHTS.upcomingRankedNearTipoff,
-      }),
     },
     PENALTY_WEIGHTS: {
       finalGame: readNumber("penaltyFinalGame", {
@@ -219,10 +214,6 @@ function buildOverridesFromForm() {
       liveLowInterest: readNumber("penaltyLiveLowInterest", {
         integer: true,
         fallback: resolvedConfig.PENALTY_WEIGHTS.liveLowInterest,
-      }),
-      upcomingTooEarly: readNumber("penaltyUpcomingTooEarly", {
-        integer: true,
-        fallback: resolvedConfig.PENALTY_WEIGHTS.upcomingTooEarly,
       }),
     },
     CLOSE_GAME_RULES: {
@@ -240,11 +231,17 @@ function buildOverridesFromForm() {
         fallback: resolvedConfig.BLOWOUT_RULES.blowoutMargin,
       }),
     },
-    UPCOMING_RULES: {
-      nearTipoffMinutes: readNumber("nearTipoffMinutes", {
+    UPCOMING_TIPOFF_PROXIMITY: {
+      enabled: readChecked("upcomingTipoffProximityEnabled"),
+      horizonMinutes: readNumber("upcomingTipoffHorizonMinutes", {
+        integer: true,
+        min: 1,
+        fallback: resolvedConfig.UPCOMING_TIPOFF_PROXIMITY.horizonMinutes,
+      }),
+      maxBonus: readNumber("upcomingTipoffMaxBonus", {
         integer: true,
         min: 0,
-        fallback: resolvedConfig.UPCOMING_RULES.nearTipoffMinutes,
+        fallback: resolvedConfig.UPCOMING_TIPOFF_PROXIMITY.maxBonus,
       }),
     },
     FINAL_HOLD: {
@@ -258,19 +255,6 @@ function buildOverridesFromForm() {
         integer: true,
         min: 0,
         fallback: resolvedConfig.FINAL_HOLD.maxBonus,
-      }),
-    },
-    RANK_STRENGTH: {
-      enabled: readChecked("rankStrengthEnabled"),
-      bestRank: readNumber("rankBestRank", {
-        integer: true,
-        min: 1,
-        fallback: resolvedConfig.RANK_STRENGTH.bestRank,
-      }),
-      pointsPerSpot: readNumber("rankPointsPerSpot", {
-        integer: true,
-        min: 0,
-        fallback: resolvedConfig.RANK_STRENGTH.pointsPerSpot,
       }),
     },
     PROGRESS_BOOST: {

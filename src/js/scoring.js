@@ -28,12 +28,12 @@ export function scoreGames(games) {
  */
 export function sortGamesByImportance(scoredGames) {
   return [...scoredGames].sort((a, b) => {
+    const aStart = toNumber(a.startTimeEpoch, Number.MAX_SAFE_INTEGER);
+    const bStart = toNumber(b.startTimeEpoch, Number.MAX_SAFE_INTEGER);
+
     if (b.importanceScore !== a.importanceScore) {
       return b.importanceScore - a.importanceScore;
     }
-
-    const aStart = toNumber(a.startTimeEpoch, Number.MAX_SAFE_INTEGER);
-    const bStart = toNumber(b.startTimeEpoch, Number.MAX_SAFE_INTEGER);
 
     if (aStart !== bStart) {
       return aStart - bStart;
@@ -73,11 +73,11 @@ export function calculateImportanceScore(game) {
   addComponent("preferredConference", conferenceWeight);
   flags.hasPreferredConference = conferenceWeight > 0;
 
-  const rankStrengthWeight = getRankStrengthBonus(game);
-  addComponent("rankStrength", rankStrengthWeight);
-
   const liveProgressWeight = getLiveProgressWeight(game);
   addComponent("liveProgress", liveProgressWeight);
+
+  const upcomingTipoffProximityWeight = getUpcomingTipoffProximityBonus(game);
+  addComponent("upcomingTipoffProximity", upcomingTipoffProximityWeight);
 
   const recentFinalHoldWeight = getRecentFinalHoldBonus(game);
   addComponent("recentFinalHold", recentFinalHoldWeight);
@@ -107,11 +107,6 @@ export function calculateImportanceScore(game) {
       value: () => CONFIG.BONUS_WEIGHTS.closeLateGame,
       flag: "isCloseLateGame",
     },
-    {
-      key: "upcomingRankedNearTipoff",
-      isActive: () => isUpcomingRankedNearTipoffGame(game),
-      value: () => CONFIG.BONUS_WEIGHTS.upcomingRankedNearTipoff,
-    },
   ];
 
   bonusRules.forEach((rule) => {
@@ -138,11 +133,6 @@ export function calculateImportanceScore(game) {
       isActive: () => isLowInterestLiveGame(game),
       value: () => CONFIG.PENALTY_WEIGHTS.liveLowInterest,
     },
-    {
-      key: "upcomingTooEarlyPenalty",
-      isActive: () => isUpcomingTooEarly(game),
-      value: () => CONFIG.PENALTY_WEIGHTS.upcomingTooEarly,
-    },
   ];
 
   penaltyRules.forEach((rule) => {
@@ -167,6 +157,51 @@ export function calculateImportanceScore(game) {
 
 function getStatusWeight(status) {
   return CONFIG.STATUS_WEIGHTS[status] ?? CONFIG.STATUS_WEIGHTS.UNKNOWN;
+}
+
+/**
+ * Gradual bonus for UPCOMING games as tipoff gets closer.
+ * Closer games receive more points, up to maxBonus.
+ */
+function getUpcomingTipoffProximityBonus(game) {
+  const tipoffConfig = CONFIG.UPCOMING_TIPOFF_PROXIMITY;
+
+  if (!tipoffConfig?.enabled || game.status !== "UPCOMING") {
+    return 0;
+  }
+
+  const startEpoch = toNumber(game.startTimeEpoch, null);
+  if (!Number.isFinite(startEpoch)) {
+    return 0;
+  }
+
+  const horizonMinutes = toNumber(tipoffConfig.horizonMinutes, 0);
+  const maxBonus = toNumber(tipoffConfig.maxBonus, 0);
+
+  if (!Number.isFinite(horizonMinutes) || horizonMinutes <= 0) {
+    return 0;
+  }
+
+  if (!Number.isFinite(maxBonus) || maxBonus <= 0) {
+    return 0;
+  }
+
+  const nowEpoch = Math.floor(Date.now() / 1000);
+  const secondsUntilTipoff = startEpoch - nowEpoch;
+  const horizonSeconds = horizonMinutes * 60;
+
+  // If game should have started but still marked UPCOMING, treat as max urgency.
+  if (secondsUntilTipoff <= 0) {
+    return Math.round(maxBonus);
+  }
+
+  if (secondsUntilTipoff > horizonSeconds) {
+    return 0;
+  }
+
+  const proximityFraction = 1 - secondsUntilTipoff / horizonSeconds;
+  const bonus = proximityFraction * maxBonus;
+  return Math.max(0, Math.round(bonus));
 }
 
 /**
@@ -311,39 +346,11 @@ function isCloseLateGame(game) {
   }
 
   const isClose = margin <= CONFIG.CLOSE_GAME_RULES.closeMargin;
-  const inLateGameState = isLatePeriod(game.statusDetail);
+  const periodType = getPeriodType(game.statusDetail);
+  const inLateGameState =
+    periodType === "SECOND_HALF" || periodType === "OVERTIME" || isLatePeriod(game.statusDetail);
 
   return isClose && inLateGameState;
-}
-
-function isUpcomingRankedNearTipoffGame(game) {
-  if (game.status !== "UPCOMING") {
-    return false;
-  }
-
-  return isRankedGame(game) && isNearTipoff(game);
-}
-
-function isUpcomingTooEarly(game) {
-  if (game.status !== "UPCOMING") {
-    return false;
-  }
-
-  return !isNearTipoff(game);
-}
-
-function isNearTipoff(game) {
-  const startEpoch = toNumber(game.startTimeEpoch, null);
-
-  if (!Number.isFinite(startEpoch)) {
-    return false;
-  }
-
-  const nowEpoch = Math.floor(Date.now() / 1000);
-  const secondsUntilTipoff = startEpoch - nowEpoch;
-  const windowSeconds = CONFIG.UPCOMING_RULES.nearTipoffMinutes * 60;
-
-  return secondsUntilTipoff >= 0 && secondsUntilTipoff <= windowSeconds;
 }
 
 function isLiveBlowout(game) {
@@ -419,37 +426,6 @@ function getLiveProgressWeight(game) {
   return Math.max(0, Math.round(bonus));
 }
 
-function getRankStrengthBonus(game) {
-  const rankConfig = CONFIG.RANK_STRENGTH;
-
-  if (!rankConfig?.enabled) {
-    return 0;
-  }
-
-  const awayBonus = getSingleTeamRankStrength(game.awayTeam?.rank, rankConfig);
-  const homeBonus = getSingleTeamRankStrength(game.homeTeam?.rank, rankConfig);
-  return awayBonus + homeBonus;
-}
-
-function getSingleTeamRankStrength(rank, rankConfig) {
-  if (!Number.isInteger(rank) || rank <= 0) {
-    return 0;
-  }
-
-  const bestRank = rankConfig.bestRank;
-  const pointsPerSpot = rankConfig.pointsPerSpot;
-
-  if (!Number.isFinite(bestRank) || !Number.isFinite(pointsPerSpot)) {
-    return 0;
-  }
-
-  if (rank > bestRank) {
-    return 0;
-  }
-
-  return (bestRank + 1 - rank) * pointsPerSpot;
-}
-
 function hasPreferredTeamGame(game) {
   return getTeamPreferenceWeight(game) > 0;
 }
@@ -461,15 +437,27 @@ function hasPreferredConferenceGame(game) {
 function getPeriodType(statusDetail) {
   const detail = String(statusDetail ?? "").toLowerCase();
 
-  if (detail.includes("ot") || detail.includes("overtime")) {
+  // Common NCAA scoreboard variants:
+  // "OT", "Overtime", "2nd Half", "2H", "1st Half", "1H"
+  if (/\bot\b/.test(detail) || detail.includes("overtime")) {
     return "OVERTIME";
   }
 
-  if (detail.includes("2nd") || detail.includes("second half")) {
+  if (
+    detail.includes("2nd") ||
+    detail.includes("second half") ||
+    /\b2h\b/.test(detail) ||
+    detail.includes("half 2")
+  ) {
     return "SECOND_HALF";
   }
 
-  if (detail.includes("1st") || detail.includes("first half")) {
+  if (
+    detail.includes("1st") ||
+    detail.includes("first half") ||
+    /\b1h\b/.test(detail) ||
+    detail.includes("half 1")
+  ) {
     return "FIRST_HALF";
   }
 

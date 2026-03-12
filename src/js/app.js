@@ -28,6 +28,7 @@ let lastTickerSignature = "";
 let latestSortedGames = [];
 let visibleGameLimit = getMaxVisibleGames();
 const finalSeenEpochByGameId = new Map();
+const lastStatusByGameId = new Map();
 
 /**
  * Load fresh game data and update the dashboard.
@@ -289,19 +290,29 @@ function annotateFinalTiming(games) {
     }
 
     seenIds.add(gameId);
+    const previousStatus = lastStatusByGameId.get(gameId) ?? null;
+    const currentStatus = game.status;
 
-    if (game.status === "FINAL") {
-      if (!finalSeenEpochByGameId.has(gameId)) {
+    if (currentStatus === "FINAL") {
+      // Only start final-hold when we observed a real transition into FINAL.
+      // If a game is already FINAL on first load, no hold timer is started.
+      const transitionedToFinal = Boolean(previousStatus) && previousStatus !== "FINAL";
+
+      if (transitionedToFinal && !finalSeenEpochByGameId.has(gameId)) {
         finalSeenEpochByGameId.set(gameId, nowEpoch);
       }
 
+      lastStatusByGameId.set(gameId, currentStatus);
+
       return {
         ...game,
-        finalSeenEpoch: finalSeenEpochByGameId.get(gameId),
+        finalSeenEpoch: finalSeenEpochByGameId.get(gameId) ?? null,
       };
     }
 
     finalSeenEpochByGameId.delete(gameId);
+    lastStatusByGameId.set(gameId, currentStatus);
+
     return {
       ...game,
       finalSeenEpoch: null,
@@ -312,6 +323,12 @@ function annotateFinalTiming(games) {
   Array.from(finalSeenEpochByGameId.keys()).forEach((gameId) => {
     if (!seenIds.has(gameId)) {
       finalSeenEpochByGameId.delete(gameId);
+    }
+  });
+
+  Array.from(lastStatusByGameId.keys()).forEach((gameId) => {
+    if (!seenIds.has(gameId)) {
+      lastStatusByGameId.delete(gameId);
     }
   });
 

@@ -17,6 +17,19 @@ The Node server at port `3000` now handles all of this:
 5. Open settings page:
    - `http://localhost:3000/settings`
 
+## Raspberry Pi one-file startup
+Use the script at `scripts/start-pi.sh`.
+
+1. Make it executable (first time only):
+   - `chmod +x scripts/start-pi.sh`
+2. Start server only:
+   - `./scripts/start-pi.sh`
+3. Start server + TV kiosk mode:
+   - `./scripts/start-pi.sh --kiosk`
+
+If startup fails, check:
+- `tail -n 100 /tmp/sports-command-center.log`
+
 ## Phone control on Raspberry Pi
 When running on Pi:
 1. Start server on Pi with `npm run start:proxy`

@@ -18,6 +18,11 @@ const HOST = process.env.HOST || "0.0.0.0";
 const NCAA_API_BASE = "https://ncaa-api.henrygd.me";
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const OVERRIDES_FILE_PATH = path.join(__dirname, "settings.overrides.json");
+const LOCAL_LOGOS_ROOT = path.join(PROJECT_ROOT, "assets", "logos");
+const LOGO_CATALOG_TTL_MS = 60 * 1000;
+
+let logoCatalogCache = null;
+let logoCatalogLoadedAt = 0;
 
 function setCorsHeaders(res) {
   // Dev-friendly CORS so dashboard/settings pages can call this server.
@@ -64,29 +69,33 @@ function isSafeScoreboardPath(pathname) {
 }
 
 function isSafeStaticPath(pathname) {
-  if (!pathname || pathname.includes("..")) {
+  const decodedPath = decodePathSafely(pathname);
+
+  if (!decodedPath || decodedPath.includes("..")) {
     return false;
   }
 
   const allowedTopLevel = new Set(["/", "/index.html", "/settings", "/settings.html"]);
 
-  if (allowedTopLevel.has(pathname)) {
+  if (allowedTopLevel.has(decodedPath)) {
     return true;
   }
 
-  return pathname.startsWith("/src/");
+  return decodedPath.startsWith("/src/") || decodedPath.startsWith("/assets/");
 }
 
 function normalizeStaticPath(pathname) {
-  if (pathname === "/") {
+  const decodedPath = decodePathSafely(pathname);
+
+  if (decodedPath === "/") {
     return "/index.html";
   }
 
-  if (pathname === "/settings") {
+  if (decodedPath === "/settings") {
     return "/settings.html";
   }
 
-  return pathname;
+  return decodedPath;
 }
 
 async function serveStaticFile(res, pathname) {
@@ -118,6 +127,14 @@ async function serveStaticFile(res, pathname) {
     }
 
     sendJson(res, 500, { error: "Failed to read file.", details: error.message });
+  }
+}
+
+function decodePathSafely(pathname) {
+  try {
+    return decodeURIComponent(pathname);
+  } catch (error) {
+    return pathname;
   }
 }
 
@@ -202,6 +219,99 @@ async function resetOverridesFile() {
       throw error;
     }
   }
+}
+
+function normalizeLogoName(text) {
+  const clean = String(text ?? "")
+    .toLowerCase()
+    .replace(/[_'.’`]/g, "")
+    .replace(/&/g, " and ")
+    .replace(/\(.*?\)/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+
+  return {
+    words: clean,
+    compact: clean.replace(/\s+/g, ""),
+  };
+}
+
+async function listFilesRecursive(rootDirectory) {
+  const results = [];
+
+  async function walk(currentDirectory) {
+    const entries = await fs.readdir(currentDirectory, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const absolutePath = path.join(currentDirectory, entry.name);
+
+      if (entry.isDirectory()) {
+        await walk(absolutePath);
+        continue;
+      }
+
+      results.push(absolutePath);
+    }
+  }
+
+  await walk(rootDirectory);
+  return results;
+}
+
+function toPublicPathFromAbsolute(absolutePath, rootDirectory) {
+  const relativePath = path.relative(rootDirectory, absolutePath).split(path.sep).join("/");
+  const encodedRelativePath = relativePath
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+
+  return `/assets/logos/${encodedRelativePath}`;
+}
+
+async function buildLocalLogoCatalog() {
+  try {
+    const files = await listFilesRecursive(LOCAL_LOGOS_ROOT);
+
+    const logos = files
+      .filter((filePath) => path.extname(filePath).toLowerCase() === ".svg")
+      .map((filePath) => {
+        const fileName = path.basename(filePath);
+        const baseName = path.basename(filePath, ".svg");
+        const normalized = normalizeLogoName(baseName);
+
+        return {
+          fileName,
+          baseName,
+          words: normalized.words,
+          compact: normalized.compact,
+          url: toPublicPathFromAbsolute(filePath, LOCAL_LOGOS_ROOT),
+        };
+      })
+      .sort((a, b) => a.baseName.localeCompare(b.baseName));
+
+    return logos;
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+async function getLocalLogoCatalog() {
+  const now = Date.now();
+  const cacheIsFresh = logoCatalogCache && now - logoCatalogLoadedAt < LOGO_CATALOG_TTL_MS;
+
+  if (cacheIsFresh) {
+    return logoCatalogCache;
+  }
+
+  const freshCatalog = await buildLocalLogoCatalog();
+  logoCatalogCache = freshCatalog;
+  logoCatalogLoadedAt = now;
+  return freshCatalog;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -308,6 +418,20 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       sendJson(res, 500, {
         error: "Failed to reset overrides.",
+        details: error.message,
+      });
+    }
+
+    return;
+  }
+
+  if (pathname === "/logos/catalog" && req.method === "GET") {
+    try {
+      const logos = await getLocalLogoCatalog();
+      sendJson(res, 200, { logos, count: logos.length });
+    } catch (error) {
+      sendJson(res, 500, {
+        error: "Failed to build local logo catalog.",
         details: error.message,
       });
     }

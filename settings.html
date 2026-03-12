@@ -76,10 +76,6 @@
               Close Late Game
               <input id="bonusCloseLateGame" type="number" step="1" />
             </label>
-            <label>
-              Ranked Near Tipoff
-              <input id="bonusUpcomingNearTipoff" type="number" step="1" />
-            </label>
           </div>
         </section>
 
@@ -98,10 +94,6 @@
               Live Low Interest Penalty
               <input id="penaltyLiveLowInterest" type="number" step="1" />
             </label>
-            <label>
-              Upcoming Too Early Penalty
-              <input id="penaltyUpcomingTooEarly" type="number" step="1" />
-            </label>
           </div>
         </section>
 
@@ -116,9 +108,17 @@
               Blowout Margin
               <input id="blowoutMargin" type="number" min="0" step="1" />
             </label>
+            <label class="checkbox-field">
+              <input id="upcomingTipoffProximityEnabled" type="checkbox" />
+              Enable Tipoff Proximity Bonus
+            </label>
             <label>
-              Near Tipoff Window (minutes)
-              <input id="nearTipoffMinutes" type="number" min="0" step="1" />
+              Tipoff Proximity Horizon (minutes)
+              <input id="upcomingTipoffHorizonMinutes" type="number" min="1" step="1" />
+            </label>
+            <label>
+              Tipoff Proximity Max Bonus
+              <input id="upcomingTipoffMaxBonus" type="number" min="0" step="1" />
             </label>
             <label class="checkbox-field">
               <input id="finalHoldEnabled" type="checkbox" />
@@ -138,18 +138,6 @@
         <section class="settings-card">
           <h2>Advanced Signals</h2>
           <div class="field-grid">
-            <label class="checkbox-field">
-              <input id="rankStrengthEnabled" type="checkbox" />
-              Enable Rank Strength
-            </label>
-            <label>
-              Rank Best Spot
-              <input id="rankBestRank" type="number" min="1" step="1" />
-            </label>
-            <label>
-              Rank Points Per Spot
-              <input id="rankPointsPerSpot" type="number" min="0" step="1" />
-            </label>
             <label class="checkbox-field">
               <input id="progressBoostEnabled" type="checkbox" />
               Enable Live Progress Boost

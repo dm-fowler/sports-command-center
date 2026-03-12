@@ -57,7 +57,6 @@ function deepMergeMutable(target, source) {
 //   statusWeight
 // + preferredTeamWeight
 // + preferredConferenceWeight
-// + rankStrengthBonus
 // + liveProgressBonus
 // + all active bonuses
 // - all active penalties
@@ -66,8 +65,7 @@ function deepMergeMutable(target, source) {
 // - preferredConferenceWeight uses the HIGHER conference weight from the two teams (not both added).
 // - closeGame bonus applies to LIVE games with margin <= closeMargin.
 // - closeLateGame bonus applies when closeGame is true AND statusDetail matches latePeriodKeywords.
-// - upcomingRankedNearTipoff applies to UPCOMING + ranked + tipoff within nearTipoffMinutes.
-// - upcomingTooEarly penalty applies to UPCOMING games outside the nearTipoffMinutes window.
+// - upcomingTipoffProximity adds a gradual bonus as tipoff gets closer.
 // - finalHold keeps newly final games elevated briefly, then fades them out.
 // ============================================================
 const QUICK_TUNE = {
@@ -89,7 +87,7 @@ const QUICK_TUNE = {
   },
 
   conferenceWeights: {
-    "big-ten": 55,
+    "big-ten": 50,
     sec: 50,
     acc: 50,
     "big-12": 50,
@@ -106,14 +104,12 @@ const QUICK_TUNE = {
     bothTeamsRanked: 320,
     closeGame: 170,
     closeLateGame: 520,
-    upcomingRankedNearTipoff: 420,
   },
 
   penaltyWeights: {
     finalGame: 200,
     liveBlowout: 260,
     liveLowInterest: 180,
-    upcomingTooEarly: 260,
   },
 
   // Keep newly final games on-screen for a short window, then let them drop.
@@ -132,21 +128,20 @@ const QUICK_TUNE = {
     blowoutMargin: 15,
   },
 
-  upcomingRules: {
-    nearTipoffMinutes: 25,
-  },
-
-  rankStrength: {
+  // Gradual upcoming-game bonus: closer tipoff => higher score.
+  // This replaces custom sorting overrides with a visible score component.
+  upcomingTipoffProximity: {
     enabled: true,
-    bestRank: 25,
-    pointsPerSpot: 10,
+    horizonMinutes: 360,
+    maxBonus: 120,
   },
 
   progressBoost: {
     enabled: true,
-    secondHalfBonus: 45,
-    overtimeBonus: 90,
-    maxClockProgressBonus: 50,
+    // Higher values here push later LIVE games above early LIVE games.
+    secondHalfBonus: 140,
+    overtimeBonus: 260,
+    maxClockProgressBonus: 90,
     firstHalfMinutes: 20,
     secondHalfMinutes: 20,
     overtimeMinutes: 5,
@@ -190,6 +185,19 @@ export const CONFIG = {
 
   // Team logo options.
   TEAM_BRANDING: {
+    // Local logos from assets/logos are fastest and most reliable for Pi setups.
+    LOCAL_LOGOS_ENABLED: true,
+    PREFER_LOCAL_LOGOS: true,
+    LOCAL_LOGO_CATALOG_URL: buildLocalServerUrl("/logos/catalog"),
+    // Optional manual fixes for teams with ambiguous names.
+    // Key format: normalized team seo/name (lowercase, letters+numbers+hyphen).
+    // Value format: local logo filename (for example "Miami (Ohio).svg").
+    LOCAL_LOGO_OVERRIDES: {
+      "miami-oh": "Miami (Ohio).svg",
+      "miami-fl": "Miami.svg",
+    },
+
+    // Remote NCAA logos remain as fallback for any team not found locally.
     USE_REAL_LOGOS: true,
     LOGO_BASE_URL: "https://ncaa-api.henrygd.me/logo",
   },
@@ -218,11 +226,7 @@ export const CONFIG = {
 
   BLOWOUT_RULES: QUICK_TUNE.blowoutRules,
 
-  UPCOMING_RULES: QUICK_TUNE.upcomingRules,
-
-  // Ranking metric using scoreboard poll rank.
-  // Higher-ranked teams add more points.
-  RANK_STRENGTH: QUICK_TUNE.rankStrength,
+  UPCOMING_TIPOFF_PROXIMITY: QUICK_TUNE.upcomingTipoffProximity,
 
   DISPLAY: {
     TIME_ZONE: "America/Chicago",
@@ -271,6 +275,10 @@ export const CONFIG = {
  */
 export function getSettingsServerBaseUrl() {
   return buildLocalServerUrl("/settings");
+}
+
+export function getLocalServerBaseUrl() {
+  return buildLocalServerUrl("");
 }
 
 /**
