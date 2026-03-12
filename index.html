@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sports Command Center - NCAA Men's Basketball</title>
+    <link rel="stylesheet" href="./src/css/styles.css" />
+  </head>
+  <body>
+    <main class="dashboard">
+      <section id="appMessage" class="app-message app-message--hidden" aria-live="polite"></section>
+
+      <section class="games-grid" id="gamesGrid" aria-label="Today's games"></section>
+
+      <section class="ticker ticker--hidden" id="tickerBar" aria-label="Additional games">
+        <div class="ticker-lane" id="tickerScoresLane">
+          <span class="ticker-label ticker-label--scores">Scores</span>
+          <div class="ticker-panel">
+            <p class="ticker-text" id="tickerScoresText"></p>
+          </div>
+          <span class="ticker-count" id="tickerScoresCount"></span>
+        </div>
+
+        <div class="ticker-lane" id="tickerUpcomingLane">
+          <span class="ticker-label ticker-label--upcoming">Upcoming</span>
+          <div class="ticker-panel">
+            <p class="ticker-text" id="tickerUpcomingText"></p>
+          </div>
+          <span class="ticker-count" id="tickerUpcomingCount"></span>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./src/js/app.js"></script>
+  </body>
+</html>

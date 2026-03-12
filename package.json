@@ -1,0 +1,9 @@
+{
+  "name": "sports-command-center",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NCAA sports dashboard with local proxy to avoid browser CORS issues.",
+  "scripts": {
+    "start:proxy": "node server/server.js"
+  }
+}

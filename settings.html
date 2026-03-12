@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sports Command Center - Settings</title>
+    <link rel="stylesheet" href="./src/css/settings.css" />
+  </head>
+  <body>
+    <main class="settings-page">
+      <header class="settings-header">
+        <h1>Dashboard Settings</h1>
+        <p>Use this page from your phone to tune the TV dashboard without editing code.</p>
+        <p class="settings-server">Server: <span id="settingsServerUrl">Loading...</span></p>
+      </header>
+
+      <section id="statusMessage" class="status-message status-message--hidden" aria-live="polite"></section>
+
+      <form id="settingsForm" class="settings-form">
+        <section class="settings-card">
+          <h2>Layout and Refresh</h2>
+          <div class="field-grid">
+            <label>
+              Refresh Interval (seconds)
+              <input id="refreshIntervalSeconds" type="number" min="1" step="1" />
+            </label>
+            <label>
+              Ticker Cycle (seconds)
+              <input id="tickerCycleSeconds" type="number" min="1" step="1" />
+            </label>
+            <label>
+              Grid Columns
+              <input id="gridColumns" type="number" min="1" step="1" />
+            </label>
+            <label>
+              Grid Rows
+              <input id="gridRows" type="number" min="1" step="1" />
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-card">
+          <h2>Status Weights</h2>
+          <div class="field-grid">
+            <label>
+              LIVE
+              <input id="statusLive" type="number" step="1" />
+            </label>
+            <label>
+              UPCOMING
+              <input id="statusUpcoming" type="number" step="1" />
+            </label>
+            <label>
+              FINAL
+              <input id="statusFinal" type="number" step="1" />
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-card">
+          <h2>Bonus Weights</h2>
+          <div class="field-grid">
+            <label>
+              Ranked Game
+              <input id="bonusRankedGame" type="number" step="1" />
+            </label>
+            <label>
+              Both Teams Ranked
+              <input id="bonusBothTeamsRanked" type="number" step="1" />
+            </label>
+            <label>
+              Close Game
+              <input id="bonusCloseGame" type="number" step="1" />
+            </label>
+            <label>
+              Close Late Game
+              <input id="bonusCloseLateGame" type="number" step="1" />
+            </label>
+            <label>
+              Ranked Near Tipoff
+              <input id="bonusUpcomingNearTipoff" type="number" step="1" />
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-card">
+          <h2>Penalty Weights</h2>
+          <div class="field-grid">
+            <label>
+              Final Game Penalty
+              <input id="penaltyFinalGame" type="number" step="1" />
+            </label>
+            <label>
+              Live Blowout Penalty
+              <input id="penaltyLiveBlowout" type="number" step="1" />
+            </label>
+            <label>
+              Live Low Interest Penalty
+              <input id="penaltyLiveLowInterest" type="number" step="1" />
+            </label>
+            <label>
+              Upcoming Too Early Penalty
+              <input id="penaltyUpcomingTooEarly" type="number" step="1" />
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-card">
+          <h2>Rules and Final Hold</h2>
+          <div class="field-grid">
+            <label>
+              Close Margin
+              <input id="closeMargin" type="number" min="0" step="1" />
+            </label>
+            <label>
+              Blowout Margin
+              <input id="blowoutMargin" type="number" min="0" step="1" />
+            </label>
+            <label>
+              Near Tipoff Window (minutes)
+              <input id="nearTipoffMinutes" type="number" min="0" step="1" />
+            </label>
+            <label class="checkbox-field">
+              <input id="finalHoldEnabled" type="checkbox" />
+              Enable Final Hold Window
+            </label>
+            <label>
+              Final Hold Minutes
+              <input id="finalHoldMinutes" type="number" min="0" step="1" />
+            </label>
+            <label>
+              Final Hold Max Bonus
+              <input id="finalHoldMaxBonus" type="number" min="0" step="1" />
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-card">
+          <h2>Advanced Signals</h2>
+          <div class="field-grid">
+            <label class="checkbox-field">
+              <input id="rankStrengthEnabled" type="checkbox" />
+              Enable Rank Strength
+            </label>
+            <label>
+              Rank Best Spot
+              <input id="rankBestRank" type="number" min="1" step="1" />
+            </label>
+            <label>
+              Rank Points Per Spot
+              <input id="rankPointsPerSpot" type="number" min="0" step="1" />
+            </label>
+            <label class="checkbox-field">
+              <input id="progressBoostEnabled" type="checkbox" />
+              Enable Live Progress Boost
+            </label>
+            <label>
+              2nd Half Bonus
+              <input id="progressSecondHalfBonus" type="number" step="1" />
+            </label>
+            <label>
+              Overtime Bonus
+              <input id="progressOvertimeBonus" type="number" step="1" />
+            </label>
+            <label>
+              Clock Progress Bonus (max)
+              <input id="progressMaxClockBonus" type="number" step="1" />
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-card">
+          <h2>Team and Conference Weights (JSON)</h2>
+          <p class="helper">
+            Use valid JSON objects. Example: <code>{ "michigan": 2600, "duke": 600 }</code>
+          </p>
+          <label>
+            Team Weights
+            <textarea id="teamWeightsJson" rows="6"></textarea>
+          </label>
+          <label>
+            Conference Weights
+            <textarea id="conferenceWeightsJson" rows="6"></textarea>
+          </label>
+        </section>
+
+        <footer class="settings-actions">
+          <button type="submit" class="btn btn--primary">Save Settings</button>
+          <button type="button" id="resetButton" class="btn">Reset Overrides</button>
+          <a class="btn btn--link" href="/">Open Dashboard</a>
+        </footer>
+      </form>
+    </main>
+
+    <script type="module" src="./src/js/settings.js"></script>
+  </body>
+</html>
