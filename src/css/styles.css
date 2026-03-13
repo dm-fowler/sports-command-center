@@ -122,21 +122,22 @@ body {
 }
 
 .game-card--rotating-fade-out {
-  opacity: 0;
+  opacity: 0.2;
+}
+
+.game-card--rotating-bottom-row {
+  opacity: 1;
   transition: opacity var(--rotator-fade-ms, 450ms) ease;
+  will-change: opacity;
+  transform: translateZ(0);
+}
+
+.game-card--rotating-fade-prep {
+  opacity: 0;
 }
 
 .game-card--rotating-fade-in {
-  animation: rotator-fade-in var(--rotator-fade-ms, 450ms) ease;
-}
-
-@keyframes rotator-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  opacity: 1;
 }
 
 .game-card__header {

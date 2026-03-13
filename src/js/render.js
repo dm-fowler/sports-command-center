@@ -67,15 +67,22 @@ export function renderGames(games) {
 
   games.forEach((game) => {
     const existingCard = existingCardMap.get(game.id);
+    const nextSignature = buildCardRenderSignature(game);
 
     if (existingCard) {
-      updateGameCard(existingCard, game);
+      if (existingCard.dataset.renderSignature !== nextSignature) {
+        updateGameCard(existingCard, game);
+        existingCard.dataset.renderSignature = nextSignature;
+      }
+
       desiredCards.push(existingCard);
       existingCardMap.delete(game.id);
       return;
     }
 
-    desiredCards.push(createGameCard(game));
+    const newCard = createGameCard(game);
+    newCard.dataset.renderSignature = nextSignature;
+    desiredCards.push(newCard);
   });
 
   // Remove cards for games that no longer exist.
@@ -405,11 +412,26 @@ function updateGameCard(card, game) {
   }
 
   if (game.uiMeta?.fadeInBottomRow) {
-    card.classList.add("game-card--rotating-fade-in");
+    triggerBottomRowFadeIn(card);
     card.classList.remove("game-card--rotating-fade-out");
   } else {
     card.classList.remove("game-card--rotating-fade-in");
+    card.classList.remove("game-card--rotating-fade-prep");
   }
+}
+
+function triggerBottomRowFadeIn(card) {
+  card.classList.remove("game-card--rotating-fade-out");
+  card.classList.remove("game-card--rotating-fade-in");
+  card.classList.add("game-card--rotating-fade-prep");
+
+  // Two frames ensures browser applies the 0-opacity state before transitioning to 1.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      card.classList.remove("game-card--rotating-fade-prep");
+      card.classList.add("game-card--rotating-fade-in");
+    });
+  });
 }
 
 function createCardHeader() {
@@ -665,6 +687,41 @@ function applyCardOrder(gamesGrid, orderedCards) {
 
 function buildTeamInfoLine(team) {
   return safeText(team.record, "");
+}
+
+function buildCardRenderSignature(game) {
+  const safeLogoList = Array.isArray(game.awayTeam?.logoUrls)
+    ? game.awayTeam.logoUrls.join(",")
+    : "";
+  const safeHomeLogoList = Array.isArray(game.homeTeam?.logoUrls)
+    ? game.homeTeam.logoUrls.join(",")
+    : "";
+
+  return [
+    game.id,
+    game.status,
+    game.statusDetail ?? "",
+    game.clock ?? "",
+    game.startTimeEpoch ?? "",
+    game.network ?? "",
+    game.tournamentRound ?? "",
+    game.region ?? "",
+    game.awayTeam?.name ?? "",
+    game.awayTeam?.rank ?? "",
+    game.awayTeam?.record ?? "",
+    game.awayTeam?.score ?? "",
+    game.awayTeam?.logoUrl ?? "",
+    safeLogoList,
+    game.homeTeam?.name ?? "",
+    game.homeTeam?.rank ?? "",
+    game.homeTeam?.record ?? "",
+    game.homeTeam?.score ?? "",
+    game.homeTeam?.logoUrl ?? "",
+    safeHomeLogoList,
+    game.importanceFlags?.isCloseLateGame ? "1" : "0",
+    game.uiMeta?.isBottomRowRotatorSlot ? "1" : "0",
+    game.uiMeta?.fadeInBottomRow ? "1" : "0",
+  ].join("|");
 }
 
 function buildTournamentText(game) {
