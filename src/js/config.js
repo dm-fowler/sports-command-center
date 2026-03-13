@@ -189,7 +189,7 @@ const QUICK_TUNE = {
 
   // Optional mode: replace bottom ticker with rotating final row of cards.
   rotatingBottomRow: {
-    enabled: true,
+    enabled: false,
     cycleSeconds: 8,
     fadeMs: 450,
   },
