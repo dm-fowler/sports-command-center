@@ -155,7 +155,7 @@ export function updateRefreshIntervalLabel(intervalMs) {
 /**
  * Render ESPN-style ticker for games that are not visible on cards.
  */
-export function renderTicker(hiddenGames) {
+export function renderTicker(hiddenGames, options = {}) {
   const {
     tickerBar,
     tickerScoresText,
@@ -174,7 +174,7 @@ export function renderTicker(hiddenGames) {
     return;
   }
 
-  if (!CONFIG.TICKER?.enabled) {
+  if (!CONFIG.TICKER?.enabled || options.forceHidden) {
     tickerBar.classList.add("ticker--hidden");
     stopTickerCycle();
     return;
@@ -354,12 +354,7 @@ function createGameCard(game) {
   const cardFooter = document.createElement("footer");
   cardFooter.className = "game-card__footer";
 
-  const badgeRow = document.createElement("div");
-  badgeRow.className = "badge-row";
-
   const footerMeta = createFooterMeta();
-
-  cardFooter.appendChild(badgeRow);
   cardFooter.appendChild(footerMeta.root);
 
   card.appendChild(cardHeader.root);
@@ -371,7 +366,6 @@ function createGameCard(game) {
     header: cardHeader,
     awayTeam,
     homeTeam,
-    badgeRow,
     footerMeta,
   };
 
@@ -385,30 +379,60 @@ function updateGameCard(card, game) {
 
   const refs = card._refs;
   refs.header.timeMain.textContent = getTopTimeLabel(game);
+  refs.header.statusBadge.textContent = safeText(game.status, "UNKNOWN");
+  refs.header.statusBadge.className = `status-chip status-chip--${safeText(
+    game.status,
+    "UNKNOWN"
+  ).toLowerCase()}`;
   refs.footerMeta.network.textContent = safeText(game.network, "Network TBD");
   refs.footerMeta.tournament.textContent = buildTournamentText(game);
 
   updateTeamRow(refs.awayTeam, game.awayTeam, game.status);
   updateTeamRow(refs.homeTeam, game.homeTeam, game.status);
-  updateBadgeRow(refs.badgeRow, game);
+
+  if (game.importanceFlags?.isCloseLateGame) {
+    card.classList.add("game-card--close-late");
+  } else {
+    card.classList.remove("game-card--close-late");
+  }
+
+  if (game.uiMeta?.isBottomRowRotatorSlot) {
+    card.classList.add("game-card--rotating-bottom-row");
+  } else {
+    card.classList.remove("game-card--rotating-bottom-row");
+    card.classList.remove("game-card--rotating-fade-in");
+    card.classList.remove("game-card--rotating-fade-out");
+  }
+
+  if (game.uiMeta?.fadeInBottomRow) {
+    card.classList.add("game-card--rotating-fade-in");
+    card.classList.remove("game-card--rotating-fade-out");
+  } else {
+    card.classList.remove("game-card--rotating-fade-in");
+  }
 }
 
 function createCardHeader() {
   const root = document.createElement("header");
   root.className = "game-card__header";
 
-  const right = document.createElement("div");
-  right.className = "game-card__time";
+  const time = document.createElement("div");
+  time.className = "game-card__time";
 
   const timeMain = document.createElement("p");
   timeMain.className = "time-main";
-  right.appendChild(timeMain);
+  time.appendChild(timeMain);
 
-  root.appendChild(right);
+  const statusBadge = document.createElement("span");
+  statusBadge.className = "status-chip status-chip--unknown";
+
+  root.appendChild(time);
+  root.appendChild(statusBadge);
 
   return {
     root,
     timeMain,
+    statusBadge,
   };
 }
 
@@ -416,14 +440,14 @@ function createFooterMeta() {
   const root = document.createElement("div");
   root.className = "game-card__footer-meta";
 
-  const network = document.createElement("p");
-  network.className = "network";
-
   const tournament = document.createElement("p");
   tournament.className = "tournament";
 
-  root.appendChild(network);
+  const network = document.createElement("p");
+  network.className = "network";
+
   root.appendChild(tournament);
+  root.appendChild(network);
 
   return {
     root,
@@ -508,7 +532,14 @@ function updateTeamRow(teamRowRefs, team, gameStatus) {
   updateTeamLogo(teamRowRefs, team);
   teamRowRefs.logoFallback.textContent = getTeamInitials(team.name);
   teamRowRefs.name.textContent = hasRank(team) ? `#${team.rank} ${team.name}` : team.name;
-  teamRowRefs.info.textContent = buildTeamInfoLine(team);
+  const teamInfo = buildTeamInfoLine(team);
+  teamRowRefs.info.textContent = teamInfo;
+
+  if (teamInfo) {
+    teamRowRefs.info.classList.remove("team-info--hidden");
+  } else {
+    teamRowRefs.info.classList.add("team-info--hidden");
+  }
 
   // Hide pregame scores for UPCOMING games so cards show matchup + tipoff cleanly.
   if (gameStatus === "UPCOMING") {
@@ -596,27 +627,6 @@ function parseLogoCandidates(rawValue) {
   }
 }
 
-function updateBadgeRow(row, game) {
-  row.replaceChildren();
-
-  row.appendChild(createBadge(game.status, `badge--status-${game.status.toLowerCase()}`));
-
-  if (game.importanceFlags?.isRankedGame) {
-    row.appendChild(createBadge("RANKED", "badge--ranked"));
-  }
-
-  if (game.importanceFlags?.isCloseGame || game.importanceFlags?.isCloseLateGame) {
-    row.appendChild(createBadge("CLOSE", "badge--close"));
-  }
-}
-
-function createBadge(label, className) {
-  const badge = document.createElement("span");
-  badge.className = `badge ${className}`;
-  badge.textContent = label;
-  return badge;
-}
-
 function getExistingCardMap(gamesGrid) {
   const map = new Map();
   const cards = gamesGrid.querySelectorAll(".game-card[data-game-id]");
@@ -654,17 +664,7 @@ function applyCardOrder(gamesGrid, orderedCards) {
 }
 
 function buildTeamInfoLine(team) {
-  const parts = [];
-
-  if (team.record) {
-    parts.push(team.record);
-  }
-
-  if (team.conference) {
-    parts.push(team.conference);
-  }
-
-  return parts.length > 0 ? parts.join(" | ") : "Record and conference unavailable";
+  return safeText(team.record, "");
 }
 
 function buildTournamentText(game) {

@@ -17,96 +17,97 @@
       <section id="statusMessage" class="status-message status-message--hidden" aria-live="polite"></section>
 
       <form id="settingsForm" class="settings-form">
+        <section class="settings-card settings-card--guide">
+          <h2>How Scoring Works</h2>
+          <p class="helper">
+            Final score = <strong>Status</strong> + <strong>Team</strong> + <strong>Conference</strong> +
+            <strong>Boosts</strong> - <strong>Penalties</strong>
+          </p>
+          <div class="guide-grid">
+            <p><strong>Status:</strong> biggest base priority (LIVE vs UPCOMING vs FINAL).</p>
+            <p><strong>Boosts:</strong> ranked matchups, close games, close-late games, tipoff timing.</p>
+            <p><strong>Penalties:</strong> finals, blowouts, and low-interest live games.</p>
+            <p><strong>Tune order:</strong> Status -> Boosts/Penalties -> Rules -> Team/Conference.</p>
+          </div>
+        </section>
+
         <section class="settings-card">
-          <h2>Layout and Refresh</h2>
+          <h2>Quick Controls (Most Used)</h2>
+          <p class="helper">These are the settings you will usually change first.</p>
           <div class="field-grid">
             <label>
               Refresh Interval (seconds)
               <input id="refreshIntervalSeconds" type="number" min="1" step="1" />
-            </label>
-            <label>
-              Ticker Cycle (seconds)
-              <input id="tickerCycleSeconds" type="number" min="1" step="1" />
+              <span class="field-note">How often game data is fetched.</span>
             </label>
             <label>
               Grid Columns
               <input id="gridColumns" type="number" min="1" step="1" />
+              <span class="field-note">More columns = more cards per row.</span>
             </label>
             <label>
               Grid Rows
               <input id="gridRows" type="number" min="1" step="1" />
+              <span class="field-note">Rows x columns = total visible cards.</span>
+            </label>
+            <label class="checkbox-field">
+              <input id="bottomRowRotatorEnabled" type="checkbox" />
+              Use Bottom Row Rotator (hide ticker)
+            </label>
+            <label>
+              Rotator Cycle (seconds)
+              <input id="bottomRowRotatorCycleSeconds" type="number" min="1" step="1" />
+            </label>
+            <label>
+              Rotator Fade (milliseconds)
+              <input id="bottomRowRotatorFadeMs" type="number" min="50" step="50" />
+            </label>
+            <label>
+              Ticker Cycle (seconds)
+              <input id="tickerCycleSeconds" type="number" min="1" step="1" />
+              <span class="field-note">Used only when rotator is off.</span>
             </label>
           </div>
         </section>
 
         <section class="settings-card">
-          <h2>Status Weights</h2>
+          <h2>Base Priority (Status Weights)</h2>
+          <p class="helper">Higher number means stronger baseline priority.</p>
           <div class="field-grid">
             <label>
-              LIVE
+              LIVE Base Weight
               <input id="statusLive" type="number" step="1" />
             </label>
             <label>
-              UPCOMING
+              UPCOMING Base Weight
               <input id="statusUpcoming" type="number" step="1" />
             </label>
             <label>
-              FINAL
+              FINAL Base Weight
               <input id="statusFinal" type="number" step="1" />
             </label>
           </div>
         </section>
 
         <section class="settings-card">
-          <h2>Bonus Weights</h2>
+          <h2>Boosts (Positive Score Adds)</h2>
+          <p class="helper">These increase priority when a game has these qualities.</p>
           <div class="field-grid">
             <label>
-              Ranked Game
+              Ranked Game Bonus
               <input id="bonusRankedGame" type="number" step="1" />
             </label>
             <label>
-              Both Teams Ranked
+              Both Teams Ranked Bonus
               <input id="bonusBothTeamsRanked" type="number" step="1" />
             </label>
             <label>
-              Close Game
+              Close Game Bonus
               <input id="bonusCloseGame" type="number" step="1" />
             </label>
             <label>
-              Close Late Game
+              Close Late Bonus
               <input id="bonusCloseLateGame" type="number" step="1" />
-            </label>
-          </div>
-        </section>
-
-        <section class="settings-card">
-          <h2>Penalty Weights</h2>
-          <div class="field-grid">
-            <label>
-              Final Game Penalty
-              <input id="penaltyFinalGame" type="number" step="1" />
-            </label>
-            <label>
-              Live Blowout Penalty
-              <input id="penaltyLiveBlowout" type="number" step="1" />
-            </label>
-            <label>
-              Live Low Interest Penalty
-              <input id="penaltyLiveLowInterest" type="number" step="1" />
-            </label>
-          </div>
-        </section>
-
-        <section class="settings-card">
-          <h2>Rules and Final Hold</h2>
-          <div class="field-grid">
-            <label>
-              Close Margin
-              <input id="closeMargin" type="number" min="0" step="1" />
-            </label>
-            <label>
-              Blowout Margin
-              <input id="blowoutMargin" type="number" min="0" step="1" />
             </label>
             <label class="checkbox-field">
               <input id="upcomingTipoffProximityEnabled" type="checkbox" />
@@ -119,6 +120,58 @@
             <label>
               Tipoff Proximity Max Bonus
               <input id="upcomingTipoffMaxBonus" type="number" min="0" step="1" />
+            </label>
+            <label class="checkbox-field">
+              <input id="progressBoostEnabled" type="checkbox" />
+              Enable Live Progress Boost
+            </label>
+            <label>
+              2nd Half Progress Bonus
+              <input id="progressSecondHalfBonus" type="number" step="1" />
+            </label>
+            <label>
+              Overtime Progress Bonus
+              <input id="progressOvertimeBonus" type="number" step="1" />
+            </label>
+            <label>
+              Clock Progress Bonus (max)
+              <input id="progressMaxClockBonus" type="number" step="1" />
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-card">
+          <h2>Rules and Penalties</h2>
+          <p class="helper">Rules decide when boosts/penalties trigger.</p>
+          <div class="field-grid">
+            <label>
+              Close Margin
+              <input id="closeMargin" type="number" min="0" step="1" />
+            </label>
+            <label>
+              Close Late Margin
+              <input id="closeLateMargin" type="number" min="0" step="1" />
+            </label>
+            <label>
+              Close Late Minutes Left
+              <input id="closeLateMinutesLeft" type="number" min="0" step="1" />
+              <span class="field-note">Applies in 2nd half and overtime only.</span>
+            </label>
+            <label>
+              Blowout Margin
+              <input id="blowoutMargin" type="number" min="0" step="1" />
+            </label>
+            <label>
+              Final Game Penalty
+              <input id="penaltyFinalGame" type="number" step="1" />
+            </label>
+            <label>
+              Live Blowout Penalty
+              <input id="penaltyLiveBlowout" type="number" step="1" />
+            </label>
+            <label>
+              Live Low-Interest Penalty
+              <input id="penaltyLiveLowInterest" type="number" step="1" />
             </label>
             <label class="checkbox-field">
               <input id="finalHoldEnabled" type="checkbox" />
@@ -136,38 +189,16 @@
         </section>
 
         <section class="settings-card">
-          <h2>Advanced Signals</h2>
-          <div class="field-grid">
-            <label class="checkbox-field">
-              <input id="progressBoostEnabled" type="checkbox" />
-              Enable Live Progress Boost
-            </label>
-            <label>
-              2nd Half Bonus
-              <input id="progressSecondHalfBonus" type="number" step="1" />
-            </label>
-            <label>
-              Overtime Bonus
-              <input id="progressOvertimeBonus" type="number" step="1" />
-            </label>
-            <label>
-              Clock Progress Bonus (max)
-              <input id="progressMaxClockBonus" type="number" step="1" />
-            </label>
-          </div>
-        </section>
-
-        <section class="settings-card">
-          <h2>Team and Conference Weights (JSON)</h2>
+          <h2>Team and Conference Preferences</h2>
           <p class="helper">
-            Use valid JSON objects. Example: <code>{ "michigan": 2600, "duke": 600 }</code>
+            Use valid JSON objects. Example: <code>{ "michigan": 2400, "duke": 600 }</code>
           </p>
           <label>
-            Team Weights
+            Team Weights JSON
             <textarea id="teamWeightsJson" rows="6"></textarea>
           </label>
           <label>
-            Conference Weights
+            Conference Weights JSON
             <textarea id="conferenceWeightsJson" rows="6"></textarea>
           </label>
         </section>

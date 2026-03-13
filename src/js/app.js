@@ -21,12 +21,18 @@ import { scoreGames, sortGamesByImportance } from "./scoring.js";
 let isRefreshing = false;
 let refreshIntervalId = null;
 let clockIntervalId = null;
+let settingsSyncIntervalId = null;
 let resizeDebounceId = null;
+let bottomRowRotatorIntervalId = null;
+let bottomRowFadeTimeoutId = null;
+let isSyncingConfig = false;
 let hasRenderedOnce = false;
 let lastCardsSignature = "";
 let lastTickerSignature = "";
 let latestSortedGames = [];
 let visibleGameLimit = getMaxVisibleGames();
+let bottomRowRotatorPageIndex = 0;
+let bottomRowRotatorTimerSignature = "";
 const finalSeenEpochByGameId = new Map();
 const lastStatusByGameId = new Map();
 
@@ -85,9 +91,8 @@ function startTimers() {
     }, CONFIG.CLOCK_INTERVAL_MS);
   }
 
-  refreshIntervalId = window.setInterval(() => {
-    refreshDashboard();
-  }, CONFIG.API.REFRESH_INTERVAL_MS);
+  startRefreshTimer();
+  startSettingsSyncTimer();
 }
 
 /**
@@ -104,12 +109,48 @@ function stopTimers() {
     refreshIntervalId = null;
   }
 
+  if (settingsSyncIntervalId) {
+    clearInterval(settingsSyncIntervalId);
+    settingsSyncIntervalId = null;
+  }
+
+  stopBottomRowRotator();
+
   stopTickerCycle();
 
   if (resizeDebounceId) {
     clearTimeout(resizeDebounceId);
     resizeDebounceId = null;
   }
+}
+
+function startRefreshTimer() {
+  if (refreshIntervalId) {
+    clearInterval(refreshIntervalId);
+  }
+
+  refreshIntervalId = window.setInterval(() => {
+    refreshDashboard();
+  }, CONFIG.API.REFRESH_INTERVAL_MS);
+}
+
+function startSettingsSyncTimer() {
+  if (settingsSyncIntervalId) {
+    clearInterval(settingsSyncIntervalId);
+    settingsSyncIntervalId = null;
+  }
+
+  const syncConfig = CONFIG.SETTINGS_SYNC;
+  const enabled = Boolean(syncConfig?.enabled);
+  const intervalMs = getPositiveInteger(syncConfig?.pollIntervalMs, 5000);
+
+  if (!enabled || intervalMs <= 0) {
+    return;
+  }
+
+  settingsSyncIntervalId = window.setInterval(() => {
+    syncConfigOverrides();
+  }, intervalMs);
 }
 
 /**
@@ -132,9 +173,6 @@ function buildRenderSignature(games) {
     .join(";");
 }
 
-/**
- * Keep only the top games that fit on TV without scrolling.
- */
 function getVisibleGames(sortedGames) {
   const tvLayout = CONFIG.TV_LAYOUT;
 
@@ -147,6 +185,89 @@ function getVisibleGames(sortedGames) {
 
 function getHiddenGames(sortedGames, visibleCount) {
   return sortedGames.slice(visibleCount);
+}
+
+function getRenderModel(sortedGames, options = {}) {
+  if (!isBottomRowRotatorEnabled()) {
+    const visibleGames = getVisibleGames(sortedGames).map((game) => ({
+      ...game,
+      uiMeta: {
+        isBottomRowRotatorSlot: false,
+        fadeInBottomRow: false,
+      },
+    }));
+
+    return {
+      visibleGames,
+      hiddenGames: getHiddenGames(sortedGames, visibleGames.length),
+      hideTicker: false,
+      pageCount: 0,
+    };
+  }
+
+  const columns = getPositiveInteger(CONFIG.TV_LAYOUT?.columns, 4);
+  const rows = getPositiveInteger(CONFIG.TV_LAYOUT?.rows, 3);
+  const totalSlots = columns * rows;
+
+  if (rows <= 1 || totalSlots <= 0) {
+    const visibleGames = getVisibleGames(sortedGames).map((game) => ({
+      ...game,
+      uiMeta: {
+        isBottomRowRotatorSlot: false,
+        fadeInBottomRow: false,
+      },
+    }));
+
+    return {
+      visibleGames,
+      hiddenGames: [],
+      hideTicker: true,
+      pageCount: 0,
+    };
+  }
+
+  const fixedSlotCount = Math.max(0, totalSlots - columns);
+  const fixedGames = sortedGames.slice(0, fixedSlotCount);
+  const rotatingPool = sortedGames.slice(fixedSlotCount);
+  const rotatingPages = chunkArray(rotatingPool, columns);
+  const pageCount = rotatingPages.length;
+
+  if (pageCount === 0) {
+    const visibleGames = fixedGames.slice(0, totalSlots).map((game) => ({
+      ...game,
+      uiMeta: {
+        isBottomRowRotatorSlot: false,
+        fadeInBottomRow: false,
+      },
+    }));
+
+    return {
+      visibleGames,
+      hiddenGames: [],
+      hideTicker: true,
+      pageCount: 0,
+    };
+  }
+
+  if (bottomRowRotatorPageIndex >= pageCount) {
+    bottomRowRotatorPageIndex = 0;
+  }
+
+  const activePage = rotatingPages[bottomRowRotatorPageIndex] ?? [];
+  const visibleGames = fixedGames.concat(activePage).slice(0, totalSlots).map((game, index) => ({
+    ...game,
+    uiMeta: {
+      isBottomRowRotatorSlot: index >= fixedSlotCount,
+      fadeInBottomRow: Boolean(options.animateBottomRowFadeIn && index >= fixedSlotCount),
+    },
+  }));
+
+  return {
+    visibleGames,
+    hiddenGames: [],
+    hideTicker: true,
+    pageCount,
+  };
 }
 
 /**
@@ -162,7 +283,8 @@ function applyTvLayoutCssVariables() {
   const maxVisibleGames = getMaxVisibleGames();
   const gap = getPositiveNumber(tvLayout.gapPx, 10);
   const outerPadding = getPositiveNumber(tvLayout.outerPaddingPx, gap);
-  const tickerHeight = CONFIG.TICKER?.enabled
+  const showTicker = CONFIG.TICKER?.enabled && !isBottomRowRotatorEnabled();
+  const tickerHeight = showTicker
     ? getPositiveNumber(tvLayout.tickerHeightPx, 46)
     : 0;
   const targetCardAspectRatio = getPositiveNumber(tvLayout.targetCardAspectRatio, 1.4);
@@ -201,6 +323,10 @@ function applyTvLayoutCssVariables() {
   root.style.setProperty("--tv-card-width", `${gridLayout.cardWidth}px`);
   root.style.setProperty("--tv-card-height", `${gridLayout.cardHeight}px`);
   root.style.setProperty("--ticker-height", `${tickerHeight}px`);
+  root.style.setProperty(
+    "--rotator-fade-ms",
+    `${getPositiveInteger(CONFIG.BOTTOM_ROW_ROTATOR?.fadeMs, 450)}ms`
+  );
 }
 
 async function startApp() {
@@ -218,6 +344,7 @@ function handleResize() {
 
   resizeDebounceId = window.setTimeout(() => {
     applyTvLayoutCssVariables();
+    restartBottomRowRotator();
 
     // Re-render current data using new card dimensions/slot count.
     if (latestSortedGames.length > 0) {
@@ -228,20 +355,134 @@ function handleResize() {
   }, 120);
 }
 
-function renderFromSortedGames(sortedGames) {
-  const visibleGames = getVisibleGames(sortedGames);
-  const hiddenGames = getHiddenGames(sortedGames, visibleGames.length);
-  const nextCardsSignature = buildRenderSignature(visibleGames);
-  const nextTickerSignature = buildRenderSignature(hiddenGames);
+function renderFromSortedGames(sortedGames, options = {}) {
+  const renderModel = getRenderModel(sortedGames, options);
+  updateBottomRowRotatorTimer(renderModel.pageCount);
+
+  const nextCardsSignature = buildRenderSignature(renderModel.visibleGames);
+  const nextTickerSignature = `${renderModel.hideTicker ? "hidden" : "shown"}:${buildRenderSignature(
+    renderModel.hiddenGames
+  )}`;
 
   if (nextCardsSignature !== lastCardsSignature) {
-    renderGames(visibleGames);
+    renderGames(renderModel.visibleGames);
     lastCardsSignature = nextCardsSignature;
   }
 
   if (nextTickerSignature !== lastTickerSignature) {
-    renderTicker(hiddenGames);
+    renderTicker(renderModel.hiddenGames, { forceHidden: renderModel.hideTicker });
     lastTickerSignature = nextTickerSignature;
+  }
+}
+
+function isBottomRowRotatorEnabled() {
+  const rotator = CONFIG.BOTTOM_ROW_ROTATOR;
+  const tvLayout = CONFIG.TV_LAYOUT;
+
+  if (!rotator?.enabled || !tvLayout?.enabled) {
+    return false;
+  }
+
+  const rows = getPositiveInteger(tvLayout.rows, 3);
+  return rows > 1;
+}
+
+function updateBottomRowRotatorTimer(pageCount) {
+  if (!isBottomRowRotatorEnabled() || pageCount <= 1) {
+    stopBottomRowRotator();
+    return;
+  }
+
+  const cycleIntervalMs = getPositiveInteger(CONFIG.BOTTOM_ROW_ROTATOR?.cycleIntervalMs, 8000);
+  const timerSignature = `${pageCount}|${cycleIntervalMs}`;
+
+  if (bottomRowRotatorIntervalId && bottomRowRotatorTimerSignature === timerSignature) {
+    return;
+  }
+
+  stopBottomRowRotator();
+  bottomRowRotatorTimerSignature = timerSignature;
+  bottomRowRotatorIntervalId = window.setInterval(() => {
+    rotateBottomRowPage(pageCount);
+  }, cycleIntervalMs);
+}
+
+function rotateBottomRowPage(pageCount) {
+  if (pageCount <= 1) {
+    return;
+  }
+
+  const fadeMs = getPositiveInteger(CONFIG.BOTTOM_ROW_ROTATOR?.fadeMs, 450);
+  const rotatingCards = Array.from(
+    document.querySelectorAll(".game-card.game-card--rotating-bottom-row")
+  );
+
+  rotatingCards.forEach((card) => {
+    card.classList.remove("game-card--rotating-fade-in");
+    card.classList.add("game-card--rotating-fade-out");
+  });
+
+  if (bottomRowFadeTimeoutId) {
+    clearTimeout(bottomRowFadeTimeoutId);
+    bottomRowFadeTimeoutId = null;
+  }
+
+  bottomRowFadeTimeoutId = window.setTimeout(() => {
+    bottomRowRotatorPageIndex = (bottomRowRotatorPageIndex + 1) % pageCount;
+    lastCardsSignature = "";
+    renderFromSortedGames(latestSortedGames, { animateBottomRowFadeIn: true });
+  }, fadeMs);
+}
+
+function stopBottomRowRotator() {
+  if (bottomRowRotatorIntervalId) {
+    clearInterval(bottomRowRotatorIntervalId);
+    bottomRowRotatorIntervalId = null;
+  }
+
+  if (bottomRowFadeTimeoutId) {
+    clearTimeout(bottomRowFadeTimeoutId);
+    bottomRowFadeTimeoutId = null;
+  }
+
+  bottomRowRotatorTimerSignature = "";
+  bottomRowRotatorPageIndex = 0;
+}
+
+function restartBottomRowRotator() {
+  stopBottomRowRotator();
+}
+
+async function syncConfigOverrides() {
+  if (isSyncingConfig) {
+    return;
+  }
+
+  isSyncingConfig = true;
+
+  try {
+    const hasConfigChanges = await loadConfigOverridesFromServer();
+
+    if (!hasConfigChanges) {
+      return;
+    }
+
+    applyTvLayoutCssVariables();
+    startRefreshTimer();
+    startSettingsSyncTimer();
+    restartBottomRowRotator();
+
+    lastCardsSignature = "";
+    lastTickerSignature = "";
+    visibleGameLimit = getMaxVisibleGames();
+
+    if (latestSortedGames.length > 0) {
+      renderFromSortedGames(latestSortedGames);
+    }
+
+    refreshDashboard();
+  } finally {
+    isSyncingConfig = false;
   }
 }
 
@@ -410,6 +651,21 @@ function calculateManualGridLayout({
     cardWidth: Math.max(120, Math.floor(cardWidth)),
     cardHeight: Math.max(80, Math.floor(cardHeight)),
   };
+}
+
+function chunkArray(items, chunkSize) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return [];
+  }
+
+  const size = getPositiveInteger(chunkSize, 1);
+  const chunks = [];
+
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+
+  return chunks;
 }
 
 function getPositiveInteger(value, fallback) {

@@ -100,6 +100,14 @@ if [[ "${KIOSK_MODE}" == "true" ]]; then
     exit 0
   fi
 
+  if command -v unclutter >/dev/null 2>&1; then
+    echo "Starting unclutter to hide mouse cursor..."
+    unclutter -idle 0.5 -root >/dev/null 2>&1 &
+  else
+    echo "Tip: install unclutter to hide cursor automatically:"
+    echo "  sudo apt update && sudo apt install -y unclutter"
+  fi
+
   echo "Launching Chromium in kiosk mode..."
   "${CHROMIUM_CMD}" \
     --kiosk \

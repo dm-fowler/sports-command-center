@@ -260,9 +260,10 @@ function getFinalHoldRemainingFraction(game, finalHoldConfig) {
 }
 
 function getTeamPreferenceWeight(game) {
+  const statusMultiplier = getTeamPreferenceStatusMultiplier(game.status);
   const awayWeight = getSingleTeamWeight(game.awayTeam);
   const homeWeight = getSingleTeamWeight(game.homeTeam);
-  return awayWeight + homeWeight;
+  return Math.round((awayWeight + homeWeight) * statusMultiplier);
 }
 
 function getSingleTeamWeight(team) {
@@ -276,6 +277,21 @@ function getSingleTeamWeight(team) {
   }
 
   return 0;
+}
+
+function getTeamPreferenceStatusMultiplier(status) {
+  const rules = CONFIG.TEAM_PREFERENCE_RULES;
+
+  if (!rules || typeof rules !== "object") {
+    return 1;
+  }
+
+  if (status === "FINAL") {
+    const multiplier = toNumber(rules.finalStatusMultiplier, 1);
+    return Number.isFinite(multiplier) && multiplier >= 0 ? multiplier : 1;
+  }
+
+  return 1;
 }
 
 function getConferencePreferenceWeight(game) {
@@ -345,12 +361,32 @@ function isCloseLateGame(game) {
     return false;
   }
 
-  const isClose = margin <= CONFIG.CLOSE_GAME_RULES.closeMargin;
-  const periodType = getPeriodType(game.statusDetail);
-  const inLateGameState =
-    periodType === "SECOND_HALF" || periodType === "OVERTIME" || isLatePeriod(game.statusDetail);
+  const closeLateMargin = toNumber(
+    CONFIG.CLOSE_GAME_RULES.closeLateMargin,
+    CONFIG.CLOSE_GAME_RULES.closeMargin
+  );
+  const isClose = margin <= closeLateMargin;
+  const isLateByClock = isInCloseLateClockWindow(game);
 
-  return isClose && inLateGameState;
+  return isClose && isLateByClock;
+}
+
+function isInCloseLateClockWindow(game) {
+  const periodType = getPeriodType(game.statusDetail);
+
+  if (periodType !== "SECOND_HALF" && periodType !== "OVERTIME") {
+    return false;
+  }
+
+  const lateMinutesLeft = toNumber(CONFIG.CLOSE_GAME_RULES.closeLateMinutesLeft, 8);
+  const lateSecondsLeft = Math.max(0, lateMinutesLeft) * 60;
+  const clockSeconds = parseClockToSeconds(game.clock);
+
+  if (!Number.isFinite(clockSeconds)) {
+    return false;
+  }
+
+  return clockSeconds <= lateSecondsLeft;
 }
 
 function isLiveBlowout(game) {
@@ -377,18 +413,6 @@ function isLowInterestLiveGame(game) {
   const preferredConference = hasPreferredConferenceGame(game);
 
   return !ranked && !close && !preferredTeam && !preferredConference;
-}
-
-function isLatePeriod(statusDetail) {
-  if (!statusDetail) {
-    return false;
-  }
-
-  const detail = String(statusDetail).toLowerCase();
-
-  return CONFIG.CLOSE_GAME_RULES.latePeriodKeywords.some((keyword) =>
-    detail.includes(keyword.toLowerCase())
-  );
 }
 
 /**

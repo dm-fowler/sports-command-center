@@ -50,27 +50,61 @@ function deepMergeMutable(target, source) {
 // QUICK_TUNE (EDIT HERE FIRST)
 // ============================================================
 // Beginner shortcut:
-// You can tune most dashboard behavior by changing values in this block.
+// Most day-to-day tuning should happen in this block.
 //
-// Scoring formula:
-// finalScore =
-//   statusWeight
-// + preferredTeamWeight
-// + preferredConferenceWeight
-// + liveProgressBonus
-// + all active bonuses
-// - all active penalties
+// ------------------- SCORING CHEAT SHEET --------------------
+// Final score is built from:
+//   base status score
+// + team preference
+// + conference preference (higher side only)
+// + game situation boosts
+// - game situation penalties
 //
-// Rule notes:
-// - preferredConferenceWeight uses the HIGHER conference weight from the two teams (not both added).
-// - closeGame bonus applies to LIVE games with margin <= closeMargin.
-// - closeLateGame bonus applies when closeGame is true AND statusDetail matches latePeriodKeywords.
-// - upcomingTipoffProximity adds a gradual bonus as tipoff gets closer.
-// - finalHold keeps newly final games elevated briefly, then fades them out.
+// 1) STATUS_WEIGHTS (biggest driver)
+// - LIVE: baseline for all live games.
+// - UPCOMING: baseline for pre-tip games.
+// - FINAL: baseline for finished games.
+// If ordering feels wrong globally, tune this first.
+//
+// 2) TEAM_WEIGHTS + TEAM_PREFERENCE_RULES
+// - TEAM_WEIGHTS boosts your preferred teams.
+// - finalStatusMultiplier controls how much that boost remains once a game is FINAL.
+//   Example: 0 means preferred-team boost is removed after final.
+//
+// 3) CONFERENCE_WEIGHTS
+// - Adds a conference preference bonus.
+// - Uses only the higher conference weight from the two teams (not both added).
+//
+// 4) BONUS_WEIGHTS
+// - rankedGame: one ranked team.
+// - bothTeamsRanked: both ranked.
+// - closeGame: live margin <= closeMargin.
+// - closeLateGame: live margin <= closeLateMargin AND clock <= closeLateMinutesLeft
+//   in 2nd half/OT.
+//
+// 5) PENALTY_WEIGHTS
+// - finalGame: final games are pushed down (except during final-hold window).
+// - liveBlowout: large-margin live games.
+// - liveLowInterest: live games with no ranked/close/preferred signals.
+//
+// 6) TIMING BOOSTS
+// - upcomingTipoffProximity: gradual boost as tipoff gets closer.
+// - progressBoost: small live-game boost as games get later (2nd half/OT and clock progress).
+//
+// 7) FINAL_HOLD
+// - Keeps newly final games visible briefly, then fades the boost out.
+//
+// Quick tune order:
+// 1) statusWeights  2) bonusWeights/penaltyWeights  3) closeGameRules
+// 4) teamWeights/conferenceWeights  5) tipoff/progress/finalHold
 // ============================================================
 const QUICK_TUNE = {
   refreshIntervalSeconds: 3,
   clockIntervalMs: 1000,
+
+  // Automatically pull saved settings from /settings/config.
+  // This removes the need for manual browser refresh after saving settings.
+  settingsSyncSeconds: 5,
 
   // TV layout sizing control:
   // Change these values to control BOTH:
@@ -95,8 +129,13 @@ const QUICK_TUNE = {
   },
 
   teamWeights: {
-    // Michigan should almost always be near the top.
-    michigan: 2600,
+    // Michigan stays strongly preferred, but final games are reduced by status multiplier below.
+    michigan: 2400,
+  },
+
+  // Prevent preferred-team bonus from overpowering live/upcoming games once a game is FINAL.
+  teamPreferenceRules: {
+    finalStatusMultiplier: 0,
   },
 
   bonusWeights: {
@@ -121,7 +160,8 @@ const QUICK_TUNE = {
 
   closeGameRules: {
     closeMargin: 8,
-    latePeriodKeywords: ["2nd", "second half", "ot", "overtime"],
+    closeLateMargin: 6,
+    closeLateMinutesLeft: 8,
   },
 
   blowoutRules: {
@@ -146,6 +186,13 @@ const QUICK_TUNE = {
     secondHalfMinutes: 20,
     overtimeMinutes: 5,
   },
+
+  // Optional mode: replace bottom ticker with rotating final row of cards.
+  rotatingBottomRow: {
+    enabled: true,
+    cycleSeconds: 8,
+    fadeMs: 450,
+  },
 };
 
 export const CONFIG = {
@@ -157,6 +204,11 @@ export const CONFIG = {
     DIVISION_PATH: "d1",
     REQUEST_TIMEOUT_MS: 8000,
     REFRESH_INTERVAL_MS: QUICK_TUNE.refreshIntervalSeconds * 1000,
+  },
+
+  SETTINGS_SYNC: {
+    enabled: true,
+    pollIntervalMs: QUICK_TUNE.settingsSyncSeconds * 1000,
   },
 
   CLOCK_INTERVAL_MS: QUICK_TUNE.clockIntervalMs,
@@ -183,6 +235,13 @@ export const CONFIG = {
     cycleIntervalMs: 4500,
   },
 
+  // If enabled, this mode hides ticker and rotates games through the bottom row.
+  BOTTOM_ROW_ROTATOR: {
+    enabled: QUICK_TUNE.rotatingBottomRow.enabled,
+    cycleIntervalMs: QUICK_TUNE.rotatingBottomRow.cycleSeconds * 1000,
+    fadeMs: QUICK_TUNE.rotatingBottomRow.fadeMs,
+  },
+
   // Team logo options.
   TEAM_BRANDING: {
     // Local logos from assets/logos are fastest and most reliable for Pi setups.
@@ -195,6 +254,10 @@ export const CONFIG = {
     LOCAL_LOGO_OVERRIDES: {
       "miami-oh": "Miami (Ohio).svg",
       "miami-fl": "Miami.svg",
+      illinois: "Illinois Fighting.svg",
+      "illinois-fighting": "Illinois Fighting.svg",
+      "illinois-fighting-illini": "Illinois Fighting.svg",
+      "eastern-illinois": "Eastern Illinois.svg",
     },
 
     // Remote NCAA logos remain as fallback for any team not found locally.
@@ -212,6 +275,8 @@ export const CONFIG = {
   // Team preference weights
   // Keys use normalized team names (lowercase).
   TEAM_WEIGHTS: QUICK_TUNE.teamWeights,
+
+  TEAM_PREFERENCE_RULES: QUICK_TUNE.teamPreferenceRules,
 
   // Bonus weights for game situations
   BONUS_WEIGHTS: QUICK_TUNE.bonusWeights,
@@ -281,6 +346,8 @@ export function getLocalServerBaseUrl() {
   return buildLocalServerUrl("");
 }
 
+let lastOverridesSignature = null;
+
 /**
  * Apply an override object into live CONFIG.
  * This mutates CONFIG in place so existing imports see updated values.
@@ -319,9 +386,20 @@ export async function loadConfigOverridesFromServer() {
     }
 
     const payload = await response.json();
-    applyConfigOverrides(payload?.overrides);
+    const overrides = isPlainObject(payload?.overrides) ? payload.overrides : {};
+    const nextSignature = JSON.stringify(overrides);
+    const hasChanged = nextSignature !== lastOverridesSignature;
+
+    if (!hasChanged) {
+      return false;
+    }
+
+    applyConfigOverrides(overrides);
+    lastOverridesSignature = nextSignature;
+    return true;
   } catch (error) {
     // App should still run with defaults if settings endpoint is unavailable.
     console.warn("Using default config (settings override unavailable):", error.message);
+    return false;
   }
 }

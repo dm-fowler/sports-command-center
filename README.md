@@ -1,5 +1,8 @@
 # Sports Command Center
 
+## Quick command cheat sheet
+- See `PI_COMMANDS.md` for copy/paste Raspberry Pi commands (SSH, startup service, kiosk, refresh, updates, troubleshooting).
+
 ## What the local server does
 The Node server at port `3000` now handles all of this:
 1. NCAA API proxy (`/api/...`) to avoid CORS errors
@@ -26,6 +29,8 @@ Use the script at `scripts/start-pi.sh`.
    - `./scripts/start-pi.sh`
 3. Start server + TV kiosk mode:
    - `./scripts/start-pi.sh --kiosk`
+4. Optional (recommended) for hidden cursor in kiosk:
+   - `sudo apt install -y unclutter`
 
 If startup fails, check:
 - `tail -n 100 /tmp/sports-command-center.log`

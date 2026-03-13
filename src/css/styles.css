@@ -114,12 +114,41 @@ body {
   overflow: hidden;
 }
 
+.game-card--close-late {
+  border-color: rgba(255, 76, 76, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(255, 76, 76, 0.5),
+    0 8px 24px rgba(0, 0, 0, 0.32);
+}
+
+.game-card--rotating-fade-out {
+  opacity: 0;
+  transition: opacity var(--rotator-fade-ms, 450ms) ease;
+}
+
+.game-card--rotating-fade-in {
+  animation: rotator-fade-in var(--rotator-fade-ms, 450ms) ease;
+}
+
+@keyframes rotator-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .game-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   margin-bottom: 0.45rem;
 }
 
 .game-card__time {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -133,7 +162,7 @@ body {
 .time-main {
   margin: 0;
   font-family: "Barlow Condensed", "Segoe UI", sans-serif;
-  font-size: clamp(1.1rem, 1.8vw, 1.45rem);
+  font-size: clamp(1rem, 1.6vw, 1.3rem);
   letter-spacing: 0.03em;
   line-height: 1;
   font-weight: 700;
@@ -141,6 +170,41 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.status-chip {
+  position: static;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 700;
+  border: 1px solid transparent;
+  background: rgba(149, 160, 182, 0.2);
+  color: #d5dcef;
+}
+
+.status-chip--live {
+  background: rgba(0, 209, 166, 0.2);
+  border-color: rgba(0, 209, 166, 0.45);
+  color: #99ffe4;
+}
+
+.status-chip--upcoming {
+  background: rgba(255, 184, 77, 0.2);
+  border-color: rgba(255, 184, 77, 0.45);
+  color: #ffe3b3;
+}
+
+.status-chip--final {
+  background: rgba(170, 181, 201, 0.2);
+  border-color: rgba(170, 181, 201, 0.45);
+  color: #d7e0f0;
 }
 
 .teams {
@@ -209,7 +273,7 @@ body {
 
 .team-name {
   margin: 0;
-  font-size: clamp(1rem, 1.8vw, 1.26rem);
+  font-size: clamp(1.12rem, 2vw, 1.5rem);
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -219,10 +283,14 @@ body {
 .team-info {
   margin: 0.08rem 0 0;
   color: var(--text-muted);
-  font-size: clamp(0.7rem, 1.1vw, 0.84rem);
+  font-size: clamp(0.64rem, 1vw, 0.75rem);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.team-info--hidden {
+  display: none;
 }
 
 .team-score {
@@ -239,89 +307,38 @@ body {
 
 .game-card__footer {
   margin-top: 0.45rem;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 0.45rem;
-}
-
-.badge-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  padding: 0.22rem 0.5rem;
-  font-size: 0.62rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.badge--status-live {
-  background: rgba(0, 209, 166, 0.2);
-  border: 1px solid rgba(0, 209, 166, 0.45);
-  color: #99ffe4;
-}
-
-.badge--status-upcoming {
-  background: rgba(255, 184, 77, 0.2);
-  border: 1px solid rgba(255, 184, 77, 0.45);
-  color: #ffe3b3;
-}
-
-.badge--status-final {
-  background: rgba(170, 181, 201, 0.2);
-  border: 1px solid rgba(170, 181, 201, 0.45);
-  color: #d7e0f0;
-}
-
-.badge--status-unknown {
-  background: rgba(149, 160, 182, 0.2);
-  border: 1px solid rgba(149, 160, 182, 0.45);
-  color: #d5dcef;
-}
-
-.badge--ranked {
-  background: rgba(48, 158, 255, 0.2);
-  border: 1px solid rgba(48, 158, 255, 0.45);
-  color: #c4e6ff;
-}
-
-.badge--close {
-  background: rgba(255, 97, 90, 0.2);
-  border: 1px solid rgba(255, 97, 90, 0.45);
-  color: #ffd9d6;
+  min-height: 24px;
 }
 
 .game-card__footer-meta {
-  text-align: right;
+  width: 100%;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
 .network {
   margin: 0;
   color: var(--accent-warm);
   font-weight: 700;
-  font-size: 0.72rem;
+  font-size: clamp(0.9rem, 1.45vw, 1.08rem);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: right;
+  margin-left: auto;
 }
 
 .tournament {
-  margin: 0.04rem 0 0;
+  margin: 0;
   color: var(--text-muted);
-  font-size: 0.64rem;
+  font-size: clamp(0.86rem, 1.3vw, 1rem);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: left;
 }
 
 .empty-state {
@@ -505,15 +522,6 @@ body {
 }
 
 @media (max-width: 800px) {
-  .game-card__footer {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .game-card__footer-meta {
-    text-align: left;
-  }
-
   .ticker {
     height: auto;
     min-height: 56px;

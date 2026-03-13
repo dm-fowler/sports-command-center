@@ -44,7 +44,7 @@ async function onSaveSettings(event) {
     await saveOverrides(overrides);
 
     resolvedConfig = deepMerge(deepClone(CONFIG), overrides);
-    showMessage("Settings saved. Refresh the dashboard page to apply changes.", "info");
+    showMessage("Settings saved. Dashboard applies changes automatically in a few seconds.", "info");
   } catch (error) {
     showMessage(`Save failed: ${error.message}`, "error");
   }
@@ -104,6 +104,9 @@ async function saveOverrides(overrides) {
 function populateFormFromConfig(config) {
   setNumber("refreshIntervalSeconds", Math.round(config.API.REFRESH_INTERVAL_MS / 1000));
   setNumber("tickerCycleSeconds", Math.round(config.TICKER.cycleIntervalMs / 1000));
+  setChecked("bottomRowRotatorEnabled", config.BOTTOM_ROW_ROTATOR.enabled);
+  setNumber("bottomRowRotatorCycleSeconds", Math.round(config.BOTTOM_ROW_ROTATOR.cycleIntervalMs / 1000));
+  setNumber("bottomRowRotatorFadeMs", config.BOTTOM_ROW_ROTATOR.fadeMs);
   setNumber("gridColumns", config.TV_LAYOUT.columns);
   setNumber("gridRows", config.TV_LAYOUT.rows);
 
@@ -121,6 +124,8 @@ function populateFormFromConfig(config) {
   setNumber("penaltyLiveLowInterest", config.PENALTY_WEIGHTS.liveLowInterest);
 
   setNumber("closeMargin", config.CLOSE_GAME_RULES.closeMargin);
+  setNumber("closeLateMargin", config.CLOSE_GAME_RULES.closeLateMargin);
+  setNumber("closeLateMinutesLeft", config.CLOSE_GAME_RULES.closeLateMinutesLeft);
   setNumber("blowoutMargin", config.BLOWOUT_RULES.blowoutMargin);
   setChecked("upcomingTipoffProximityEnabled", config.UPCOMING_TIPOFF_PROXIMITY.enabled);
   setNumber(
@@ -164,6 +169,19 @@ function buildOverridesFromForm() {
         min: 1,
         fallback: 4,
       }) * 1000,
+    },
+    BOTTOM_ROW_ROTATOR: {
+      enabled: readChecked("bottomRowRotatorEnabled"),
+      cycleIntervalMs: readNumber("bottomRowRotatorCycleSeconds", {
+        integer: true,
+        min: 1,
+        fallback: Math.round(resolvedConfig.BOTTOM_ROW_ROTATOR.cycleIntervalMs / 1000),
+      }) * 1000,
+      fadeMs: readNumber("bottomRowRotatorFadeMs", {
+        integer: true,
+        min: 50,
+        fallback: resolvedConfig.BOTTOM_ROW_ROTATOR.fadeMs,
+      }),
     },
     TV_LAYOUT: {
       enabled: resolvedConfig.TV_LAYOUT.enabled,
@@ -222,7 +240,16 @@ function buildOverridesFromForm() {
         min: 0,
         fallback: resolvedConfig.CLOSE_GAME_RULES.closeMargin,
       }),
-      latePeriodKeywords: resolvedConfig.CLOSE_GAME_RULES.latePeriodKeywords,
+      closeLateMargin: readNumber("closeLateMargin", {
+        integer: true,
+        min: 0,
+        fallback: resolvedConfig.CLOSE_GAME_RULES.closeLateMargin,
+      }),
+      closeLateMinutesLeft: readNumber("closeLateMinutesLeft", {
+        integer: true,
+        min: 0,
+        fallback: resolvedConfig.CLOSE_GAME_RULES.closeLateMinutesLeft,
+      }),
     },
     BLOWOUT_RULES: {
       blowoutMargin: readNumber("blowoutMargin", {
