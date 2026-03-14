@@ -160,9 +160,9 @@ const QUICK_TUNE = {
 
   closeGameRules: {
     closeMargin: 8,
-    firstHalfCloseMultiplier: 0.35,
-    closeLateMargin: 6,
-    closeLateMinutesLeft: 8,
+    firstHalfCloseMultiplier: 0.15,
+    closeLateMargin: 8,
+    closeLateMinutesLeft: 5,
   },
 
   blowoutRules: {
@@ -180,7 +180,7 @@ const QUICK_TUNE = {
   progressBoost: {
     enabled: true,
     // Clock-based progress bonus from game start to end of regulation.
-    maxClockProgressBonus: 130,
+    maxClockProgressBonus: 350,
     // Optional extra boost for overtime games.
     overtimeBonus: 120,
   },

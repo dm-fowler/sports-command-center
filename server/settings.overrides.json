@@ -37,9 +37,9 @@
   },
   "CLOSE_GAME_RULES": {
     "closeMargin": 8,
-    "firstHalfCloseMultiplier": 0.35,
-    "closeLateMargin": 6,
-    "closeLateMinutesLeft": 8
+    "firstHalfCloseMultiplier": 0.15,
+    "closeLateMargin": 8,
+    "closeLateMinutesLeft": 5
   },
   "BLOWOUT_RULES": {
     "blowoutMargin": 20
@@ -56,7 +56,7 @@
   },
   "PROGRESS_BOOST": {
     "enabled": true,
-    "maxClockProgressBonus": 130,
+    "maxClockProgressBonus": 350,
     "overtimeBonus": 120
   },
   "TEAM_WEIGHTS": {
