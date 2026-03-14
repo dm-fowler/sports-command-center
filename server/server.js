@@ -68,6 +68,10 @@ function isSafeScoreboardPath(pathname) {
   return /^[a-zA-Z0-9/_-]+$/.test(pathname);
 }
 
+function isSafeRankingsPath(pathname) {
+  return /^[a-zA-Z0-9/_-]+$/.test(pathname);
+}
+
 function isSafeStaticPath(pathname) {
   const decodedPath = decodePathSafely(pathname);
 
@@ -355,6 +359,60 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       sendJson(res, 502, {
         error: "Failed to fetch data from NCAA API.",
+        details: error.message,
+      });
+    }
+
+    return;
+  }
+
+  if (pathname.startsWith("/api/rankings/") && req.method === "GET") {
+    const rankingsPath = pathname.replace("/api/rankings/", "");
+
+    if (!rankingsPath || !isSafeRankingsPath(rankingsPath)) {
+      sendJson(res, 400, { error: "Invalid rankings path." });
+      return;
+    }
+
+    const ncaaPath = `/rankings/${rankingsPath}${search}`;
+
+    try {
+      const result = await fetchNcaaData(ncaaPath);
+      res.writeHead(result.statusCode, {
+        "Content-Type": result.contentType,
+        "Cache-Control": "no-store",
+      });
+      res.end(result.body);
+    } catch (error) {
+      sendJson(res, 502, {
+        error: "Failed to fetch rankings from NCAA API.",
+        details: error.message,
+      });
+    }
+
+    return;
+  }
+
+  if (pathname.startsWith("/api/standings/") && req.method === "GET") {
+    const standingsPath = pathname.replace("/api/standings/", "");
+
+    if (!standingsPath || !isSafeScoreboardPath(standingsPath)) {
+      sendJson(res, 400, { error: "Invalid standings path." });
+      return;
+    }
+
+    const ncaaPath = `/standings/${standingsPath}${search}`;
+
+    try {
+      const result = await fetchNcaaData(ncaaPath);
+      res.writeHead(result.statusCode, {
+        "Content-Type": result.contentType,
+        "Cache-Control": "no-store",
+      });
+      res.end(result.body);
+    } catch (error) {
+      sendJson(res, 502, {
+        error: "Failed to fetch standings from NCAA API.",
         details: error.message,
       });
     }

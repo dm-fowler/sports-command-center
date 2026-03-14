@@ -142,6 +142,7 @@ label {
 }
 
 input[type="number"],
+select,
 textarea {
   width: 100%;
   border-radius: 8px;
@@ -151,6 +152,13 @@ textarea {
   padding: 8px 10px;
   font-family: inherit;
   font-size: 0.95rem;
+}
+
+.preset-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
 }
 
 textarea {
@@ -208,5 +216,9 @@ textarea {
 
   .settings-card {
     padding: 10px;
+  }
+
+  .preset-controls {
+    grid-template-columns: 1fr;
   }
 }

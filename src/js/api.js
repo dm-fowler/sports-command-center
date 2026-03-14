@@ -5,14 +5,23 @@
 // ------------------------------------------------------------
 
 import { CONFIG, getLocalServerBaseUrl } from "./config.js";
-import { buildNcaaLogoUrl, safeText, toNumber, toSlug } from "./utils.js";
+import { buildNcaaLogoUrl, normalizeKey, safeText, toNumber, toSlug } from "./utils.js";
 
 const LOCAL_LOGO_MATCH_LIMIT = 4;
 const LOCAL_LOGO_MIN_SCORE = 38;
+const RANKINGS_CACHE_TTL_MS = 10 * 60 * 1000;
+const STANDINGS_CACHE_TTL_MS = 10 * 60 * 1000;
+const NCAA_DIRECT_BASE_URL = "https://ncaa-api.henrygd.me";
 
 let localLogoCatalogCache = null;
 let localLogoCatalogPromise = null;
 const localLogoLookupCache = new Map();
+let rankingsMapCache = null;
+let rankingsLoadedAt = 0;
+let rankingsMapPromise = null;
+let standingsMapCache = null;
+let standingsLoadedAt = 0;
+let standingsMapPromise = null;
 
 /**
  * Fetch today's Division I men's basketball games.
@@ -20,43 +29,34 @@ const localLogoLookupCache = new Map();
 export async function fetchTodaysGames() {
   // Example resolved URL:
   // http://localhost:3000/api/scoreboard/basketball-men/d1
-  const endpoint = `${CONFIG.API.BASE_URL}/scoreboard/${CONFIG.API.SPORT}/${CONFIG.API.DIVISION_PATH}`;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, CONFIG.API.REQUEST_TIMEOUT_MS);
-
   try {
-    const response = await fetch(endpoint, { signal: controller.signal });
+    const [rawData, localLogoCatalog, rankingsMap, standingsMap] = await Promise.all([
+      fetchScoreboardData(),
+      loadLocalLogoCatalog(),
+      loadRankingsMap(),
+      loadStandingsMap(),
+    ]);
 
-    if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`);
-    }
-
-    const rawData = await response.json();
-    const localLogoCatalog = await loadLocalLogoCatalog();
-    return normalizeScoreboardResponse(rawData, localLogoCatalog);
+    return normalizeScoreboardResponse(rawData, localLogoCatalog, rankingsMap, standingsMap);
   } catch (error) {
-    if (error.name === "AbortError") {
-      throw new Error("The NCAA API request timed out.");
-    }
-
     throw new Error(error.message || "Unknown API error.");
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
 
 /**
  * Normalize the full API response into an array of clean game objects.
  */
-function normalizeScoreboardResponse(rawData, localLogoCatalog) {
+function normalizeScoreboardResponse(rawData, localLogoCatalog, rankingsMap, standingsMap) {
   const rawGames = Array.isArray(rawData?.games) ? rawData.games : [];
 
   return rawGames
     .map((rawGameWrapper) =>
-      normalizeGame(rawGameWrapper?.game ?? rawGameWrapper, localLogoCatalog)
+      normalizeGame(
+        rawGameWrapper?.game ?? rawGameWrapper,
+        localLogoCatalog,
+        rankingsMap,
+        standingsMap
+      )
     )
     .filter(Boolean);
 }
@@ -64,7 +64,7 @@ function normalizeScoreboardResponse(rawData, localLogoCatalog) {
 /**
  * Normalize one game object so other files do not depend on raw API shape.
  */
-function normalizeGame(rawGame, localLogoCatalog) {
+function normalizeGame(rawGame, localLogoCatalog, rankingsMap, standingsMap) {
   if (!rawGame || !rawGame.gameID) {
     return null;
   }
@@ -83,15 +83,15 @@ function normalizeGame(rawGame, localLogoCatalog) {
     network: safeText(rawGame.network, null),
     tournamentRound: safeText(rawGame.bracketRound, null),
     region: safeText(rawGame.bracketRegion, null),
-    awayTeam: normalizeTeam(rawGame.away, localLogoCatalog),
-    homeTeam: normalizeTeam(rawGame.home, localLogoCatalog),
+    awayTeam: normalizeTeam(rawGame.away, localLogoCatalog, rankingsMap, standingsMap),
+    homeTeam: normalizeTeam(rawGame.home, localLogoCatalog, rankingsMap, standingsMap),
   };
 }
 
 /**
  * Normalize a team object into stable fields used by the UI and scoring.
  */
-function normalizeTeam(rawTeam, localLogoCatalog) {
+function normalizeTeam(rawTeam, localLogoCatalog, rankingsMap, standingsMap) {
   const names = rawTeam?.names ?? {};
   const logoSlugs = buildLogoSlugCandidates(names);
   const seo = logoSlugs[0] ?? null;
@@ -125,11 +125,335 @@ function normalizeTeam(rawTeam, localLogoCatalog) {
     seo,
     logoUrl,
     logoUrls,
-    rank: parseRank(rawTeam?.rank),
+    rank: parseTeamRank(rawTeam, names, rankingsMap),
     conference: normalizeConference(rawTeam?.conferences),
     score: parseScore(rawTeam?.score),
-    record: safeText(rawTeam?.description, null),
+    record: parseTeamRecord(rawTeam, names, rankingsMap, standingsMap),
   };
+}
+
+async function fetchScoreboardData() {
+  const endpoint = `${CONFIG.API.BASE_URL}/scoreboard/${CONFIG.API.SPORT}/${CONFIG.API.DIVISION_PATH}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, CONFIG.API.REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(endpoint, { signal: controller.signal });
+
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("The NCAA API request timed out.");
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function loadRankingsMap() {
+  const now = Date.now();
+  const cacheIsFresh = rankingsMapCache && now - rankingsLoadedAt < RANKINGS_CACHE_TTL_MS;
+
+  if (cacheIsFresh) {
+    return rankingsMapCache;
+  }
+
+  if (rankingsMapPromise) {
+    return rankingsMapPromise;
+  }
+
+  const rankingsPath = `/rankings/${CONFIG.API.SPORT}/${CONFIG.API.DIVISION_PATH}`;
+  const rankingsUrls = [
+    `${CONFIG.API.BASE_URL}${rankingsPath}`,
+    `${NCAA_DIRECT_BASE_URL}${rankingsPath}`,
+  ];
+
+  rankingsMapPromise = fetchJsonFromCandidateUrls(rankingsUrls, "Rankings")
+    .then((payload) => {
+      const rankingsData = Array.isArray(payload?.data) ? payload.data : [];
+      rankingsMapCache = buildRankingsMap(rankingsData);
+      rankingsLoadedAt = Date.now();
+      return rankingsMapCache;
+    })
+    .catch((error) => {
+      console.warn("Rankings endpoint unavailable. Using scoreboard-only rank values.", error.message);
+      rankingsMapCache = rankingsMapCache ?? new Map();
+      return rankingsMapCache;
+    })
+    .finally(() => {
+      rankingsMapPromise = null;
+    });
+
+  return rankingsMapPromise;
+}
+
+function buildRankingsMap(rankingsData) {
+  const map = new Map();
+
+  rankingsData.forEach((entry) => {
+    const rankValue = parseRank(entry?.RANK);
+    const schoolWithVotes = safeText(entry?.["SCHOOL (1ST PLACE VOTES)"], null);
+
+    if (!rankValue || !schoolWithVotes) {
+      return;
+    }
+
+    const schoolName = schoolWithVotes.replace(/\s*\(\d+\)\s*$/, "").trim();
+    const keys = buildNameLookupKeys(schoolName);
+    keys.forEach((key) => {
+      if (!map.has(key)) {
+        map.set(key, {
+          rank: rankValue,
+          record: extractRecordText(entry?.RECORD),
+        });
+      }
+    });
+  });
+
+  return map;
+}
+
+function normalizeRankingNameKey(value) {
+  const base = normalizeKey(value)
+    .replace(/\s*\(.*?\)\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!base) {
+    return "";
+  }
+
+  return base;
+}
+
+function buildNameLookupKeys(value) {
+  const base = normalizeRankingNameKey(value);
+
+  if (!base) {
+    return [];
+  }
+
+  const keys = new Set([base]);
+  keys.add(normalizeRankingNameKey(base.replace(/\bst\b/g, "state")));
+
+  const aliasKeys = [
+    [/\buconn\b/g, "connecticut"],
+    [/\bconnecticut\b/g, "uconn"],
+    [/\bole miss\b/g, "mississippi"],
+    [/\bflorida st\b/g, "florida state"],
+    [/\bnc state\b/g, "north carolina state"],
+    [/\blsu\b/g, "louisiana state"],
+  ];
+
+  aliasKeys.forEach(([pattern, replacement]) => {
+    const variant = normalizeRankingNameKey(base.replace(pattern, replacement));
+    if (variant) {
+      keys.add(variant);
+    }
+  });
+
+  return Array.from(keys).filter(Boolean);
+}
+
+function parseTeamRank(rawTeam, names, rankingsMap) {
+  const directRank = parseRank(rawTeam?.rank);
+  if (directRank) {
+    return directRank;
+  }
+
+  if (!(rankingsMap instanceof Map) || rankingsMap.size === 0) {
+    return null;
+  }
+
+  const candidates = buildRankingNameCandidates(names);
+
+  for (const candidate of candidates) {
+    const entry = rankingsMap.get(candidate);
+    const rank = toNumber(entry?.rank, null);
+    if (Number.isInteger(rank) && rank > 0) {
+      return rank;
+    }
+  }
+
+  return null;
+}
+
+function parseTeamRecord(rawTeam, names, rankingsMap, standingsMap) {
+  const scoreboardRecord = extractRecordText(rawTeam?.description);
+  if (scoreboardRecord) {
+    return scoreboardRecord;
+  }
+
+  const candidates = buildRankingNameCandidates(names);
+
+  if (standingsMap instanceof Map && standingsMap.size > 0) {
+    for (const candidate of candidates) {
+      const record = standingsMap.get(candidate);
+      if (record) {
+        return record;
+      }
+    }
+  }
+
+  if (rankingsMap instanceof Map && rankingsMap.size > 0) {
+    for (const candidate of candidates) {
+      const record = extractRecordText(rankingsMap.get(candidate)?.record);
+      if (record) {
+        return record;
+      }
+    }
+  }
+
+  return null;
+}
+
+async function loadStandingsMap() {
+  const now = Date.now();
+  const cacheIsFresh = standingsMapCache && now - standingsLoadedAt < STANDINGS_CACHE_TTL_MS;
+
+  if (cacheIsFresh) {
+    return standingsMapCache;
+  }
+
+  if (standingsMapPromise) {
+    return standingsMapPromise;
+  }
+
+  const standingsPath = `/standings/${CONFIG.API.SPORT}/${CONFIG.API.DIVISION_PATH}`;
+  const standingsUrls = [
+    `${CONFIG.API.BASE_URL}${standingsPath}`,
+    `${NCAA_DIRECT_BASE_URL}${standingsPath}`,
+  ];
+
+  standingsMapPromise = fetchJsonFromCandidateUrls(standingsUrls, "Standings")
+    .then((payload) => {
+      standingsMapCache = buildStandingsMap(payload?.data);
+      standingsLoadedAt = Date.now();
+      return standingsMapCache;
+    })
+    .catch((error) => {
+      console.warn("Standings endpoint unavailable. Records may be missing.", error.message);
+      standingsMapCache = standingsMapCache ?? new Map();
+      return standingsMapCache;
+    })
+    .finally(() => {
+      standingsMapPromise = null;
+    });
+
+  return standingsMapPromise;
+}
+
+function buildStandingsMap(standingsData) {
+  const map = new Map();
+  const conferences = Array.isArray(standingsData) ? standingsData : [];
+
+  conferences.forEach((conference) => {
+    const teams = Array.isArray(conference?.standings) ? conference.standings : [];
+
+    teams.forEach((teamRow) => {
+      const school = safeText(teamRow?.School, null);
+      const wins = safeText(teamRow?.["Overall W"], null);
+      const losses = safeText(teamRow?.["Overall L"], null);
+
+      if (!school || !wins || !losses) {
+        return;
+      }
+
+      const record = `${wins}-${losses}`;
+      const keys = getStandingsNameKeys(school);
+      keys.forEach((key) => {
+        if (!map.has(key)) {
+          map.set(key, record);
+        }
+      });
+    });
+  });
+
+  return map;
+}
+
+function getStandingsNameKeys(name) {
+  return buildNameLookupKeys(name);
+}
+
+function extractRecordText(value) {
+  const text = safeText(value, null);
+  if (!text) {
+    return null;
+  }
+
+  const match = /(\d+)\s*-\s*(\d+)/.exec(text);
+  if (!match) {
+    return null;
+  }
+
+  return `${match[1]}-${match[2]}`;
+}
+
+function buildRankingNameCandidates(names) {
+  const rawCandidates = [
+    safeText(names?.short, null),
+    safeText(names?.full, null),
+    safeText(names?.seo, null),
+    safeText(names?.char6, null),
+  ];
+
+  const normalized = [];
+
+  rawCandidates.forEach((candidate) => {
+    const baseKeys = buildNameLookupKeys(candidate);
+
+    if (baseKeys.length === 0) {
+      return;
+    }
+
+    baseKeys.forEach((key) => {
+      if (!normalized.includes(key)) {
+        normalized.push(key);
+      }
+    });
+
+    if (!candidate) {
+      return;
+    }
+
+    const noParentheses = String(candidate).replace(/\s*\(.*?\)\s*/g, " ");
+    buildNameLookupKeys(noParentheses).forEach((key) => {
+      if (!normalized.includes(key)) {
+        normalized.push(key);
+      }
+    });
+  });
+
+  return normalized;
+}
+
+async function fetchJsonFromCandidateUrls(urls, label) {
+  let lastError = null;
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+
+      if (!response.ok) {
+        throw new Error(`${label} request failed (${response.status})`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error(`${label} request failed`);
 }
 
 function buildLogoSlugCandidates(names) {

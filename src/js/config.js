@@ -78,7 +78,7 @@ function deepMergeMutable(target, source) {
 // 4) BONUS_WEIGHTS
 // - rankedGame: one ranked team.
 // - bothTeamsRanked: both ranked.
-// - closeGame: live margin <= closeMargin.
+// - closeGame: live margin <= closeMargin (scaled by firstHalfCloseMultiplier in 1st half).
 // - closeLateGame: live margin <= closeLateMargin AND clock <= closeLateMinutesLeft
 //   in 2nd half/OT.
 //
@@ -89,7 +89,7 @@ function deepMergeMutable(target, source) {
 //
 // 6) TIMING BOOSTS
 // - upcomingTipoffProximity: gradual boost as tipoff gets closer.
-// - progressBoost: small live-game boost as games get later (2nd half/OT and clock progress).
+// - progressBoost: clock-based live boost (later game clock state = higher score).
 //
 // 7) FINAL_HOLD
 // - Keeps newly final games visible briefly, then fades the boost out.
@@ -160,12 +160,13 @@ const QUICK_TUNE = {
 
   closeGameRules: {
     closeMargin: 8,
+    firstHalfCloseMultiplier: 0.35,
     closeLateMargin: 6,
     closeLateMinutesLeft: 8,
   },
 
   blowoutRules: {
-    blowoutMargin: 15,
+    blowoutMargin: 20,
   },
 
   // Gradual upcoming-game bonus: closer tipoff => higher score.
@@ -178,13 +179,10 @@ const QUICK_TUNE = {
 
   progressBoost: {
     enabled: true,
-    // Higher values here push later LIVE games above early LIVE games.
-    secondHalfBonus: 140,
-    overtimeBonus: 260,
-    maxClockProgressBonus: 90,
-    firstHalfMinutes: 20,
-    secondHalfMinutes: 20,
-    overtimeMinutes: 5,
+    // Clock-based progress bonus from game start to end of regulation.
+    maxClockProgressBonus: 130,
+    // Optional extra boost for overtime games.
+    overtimeBonus: 120,
   },
 
   // Optional mode: replace bottom ticker with rotating final row of cards.
@@ -194,6 +192,300 @@ const QUICK_TUNE = {
     fadeMs: 450,
   },
 };
+
+function createWeightPreset(id, label, description, overrides) {
+  return {
+    id,
+    label,
+    description,
+    overrides,
+  };
+}
+
+/**
+ * Weight presets for fast tuning profiles from the Settings page.
+ * - "custom-current" preserves your current hand-tuned setup.
+ * - Other presets provide different viewing styles.
+ */
+export const WEIGHT_PRESETS = [
+  createWeightPreset(
+    "custom-current",
+    "My Custom (Current)",
+    "Your current tuned weights with Michigan preference and balanced live/ranked/close behavior.",
+    {
+      STATUS_WEIGHTS: {
+        LIVE: QUICK_TUNE.statusWeights.LIVE,
+        UPCOMING: QUICK_TUNE.statusWeights.UPCOMING,
+        FINAL: QUICK_TUNE.statusWeights.FINAL,
+      },
+      BONUS_WEIGHTS: {
+        rankedGame: QUICK_TUNE.bonusWeights.rankedGame,
+        bothTeamsRanked: QUICK_TUNE.bonusWeights.bothTeamsRanked,
+        closeGame: QUICK_TUNE.bonusWeights.closeGame,
+        closeLateGame: QUICK_TUNE.bonusWeights.closeLateGame,
+      },
+      PENALTY_WEIGHTS: {
+        finalGame: QUICK_TUNE.penaltyWeights.finalGame,
+        liveBlowout: QUICK_TUNE.penaltyWeights.liveBlowout,
+        liveLowInterest: QUICK_TUNE.penaltyWeights.liveLowInterest,
+      },
+      TEAM_WEIGHTS: { ...QUICK_TUNE.teamWeights },
+      CONFERENCE_WEIGHTS: { ...QUICK_TUNE.conferenceWeights },
+      CLOSE_GAME_RULES: {
+        closeMargin: QUICK_TUNE.closeGameRules.closeMargin,
+        firstHalfCloseMultiplier: QUICK_TUNE.closeGameRules.firstHalfCloseMultiplier,
+        closeLateMargin: QUICK_TUNE.closeGameRules.closeLateMargin,
+        closeLateMinutesLeft: QUICK_TUNE.closeGameRules.closeLateMinutesLeft,
+      },
+      BLOWOUT_RULES: {
+        blowoutMargin: QUICK_TUNE.blowoutRules.blowoutMargin,
+      },
+      UPCOMING_TIPOFF_PROXIMITY: {
+        enabled: QUICK_TUNE.upcomingTipoffProximity.enabled,
+        horizonMinutes: QUICK_TUNE.upcomingTipoffProximity.horizonMinutes,
+        maxBonus: QUICK_TUNE.upcomingTipoffProximity.maxBonus,
+      },
+      PROGRESS_BOOST: {
+        enabled: QUICK_TUNE.progressBoost.enabled,
+        maxClockProgressBonus: QUICK_TUNE.progressBoost.maxClockProgressBonus,
+        overtimeBonus: QUICK_TUNE.progressBoost.overtimeBonus,
+      },
+      FINAL_HOLD: {
+        enabled: QUICK_TUNE.finalHold.enabled,
+        holdMinutes: QUICK_TUNE.finalHold.holdMinutes,
+        maxBonus: QUICK_TUNE.finalHold.maxBonus,
+      },
+    }
+  ),
+  createWeightPreset(
+    "balanced-national",
+    "Balanced National",
+    "Good all-around profile: live games lead, ranked matchups matter, and conference bias is minimal.",
+    {
+      STATUS_WEIGHTS: {
+        LIVE: 1650,
+        UPCOMING: 620,
+        FINAL: 40,
+      },
+      BONUS_WEIGHTS: {
+        rankedGame: 300,
+        bothTeamsRanked: 380,
+        closeGame: 140,
+        closeLateGame: 420,
+      },
+      PENALTY_WEIGHTS: {
+        finalGame: 260,
+        liveBlowout: 240,
+        liveLowInterest: 220,
+      },
+      TEAM_WEIGHTS: {
+        michigan: 1800,
+      },
+      CONFERENCE_WEIGHTS: {
+        "big-ten": 45,
+        sec: 45,
+        acc: 45,
+        "big-12": 45,
+        "big-east": 45,
+      },
+      CLOSE_GAME_RULES: {
+        closeMargin: 8,
+        firstHalfCloseMultiplier: 0.3,
+        closeLateMargin: 6,
+        closeLateMinutesLeft: 8,
+      },
+      BLOWOUT_RULES: {
+        blowoutMargin: 20,
+      },
+      UPCOMING_TIPOFF_PROXIMITY: {
+        enabled: true,
+        horizonMinutes: 300,
+        maxBonus: 120,
+      },
+      PROGRESS_BOOST: {
+        enabled: true,
+        maxClockProgressBonus: 180,
+        overtimeBonus: 140,
+      },
+      FINAL_HOLD: {
+        enabled: true,
+        holdMinutes: 3,
+        maxBonus: 900,
+      },
+    }
+  ),
+  createWeightPreset(
+    "live-chaos",
+    "Live Game Heavy",
+    "Prioritizes what is happening now. Upcoming games almost never jump over active live games.",
+    {
+      STATUS_WEIGHTS: {
+        LIVE: 1900,
+        UPCOMING: 420,
+        FINAL: 30,
+      },
+      BONUS_WEIGHTS: {
+        rankedGame: 220,
+        bothTeamsRanked: 300,
+        closeGame: 120,
+        closeLateGame: 360,
+      },
+      PENALTY_WEIGHTS: {
+        finalGame: 300,
+        liveBlowout: 260,
+        liveLowInterest: 240,
+      },
+      TEAM_WEIGHTS: {
+        michigan: 1700,
+      },
+      CONFERENCE_WEIGHTS: {
+        "big-ten": 40,
+        sec: 40,
+        acc: 40,
+        "big-12": 40,
+        "big-east": 40,
+      },
+      CLOSE_GAME_RULES: {
+        closeMargin: 7,
+        firstHalfCloseMultiplier: 0.2,
+        closeLateMargin: 5,
+        closeLateMinutesLeft: 7,
+      },
+      BLOWOUT_RULES: {
+        blowoutMargin: 18,
+      },
+      UPCOMING_TIPOFF_PROXIMITY: {
+        enabled: true,
+        horizonMinutes: 180,
+        maxBonus: 80,
+      },
+      PROGRESS_BOOST: {
+        enabled: true,
+        maxClockProgressBonus: 240,
+        overtimeBonus: 180,
+      },
+      FINAL_HOLD: {
+        enabled: true,
+        holdMinutes: 2,
+        maxBonus: 700,
+      },
+    }
+  ),
+  createWeightPreset(
+    "ranked-marquee",
+    "Ranked Matchups",
+    "Boosts ranked games heavily, useful when you care most about top-25 and high-profile games.",
+    {
+      STATUS_WEIGHTS: {
+        LIVE: 1680,
+        UPCOMING: 720,
+        FINAL: 40,
+      },
+      BONUS_WEIGHTS: {
+        rankedGame: 520,
+        bothTeamsRanked: 700,
+        closeGame: 110,
+        closeLateGame: 360,
+      },
+      PENALTY_WEIGHTS: {
+        finalGame: 240,
+        liveBlowout: 220,
+        liveLowInterest: 260,
+      },
+      TEAM_WEIGHTS: {
+        michigan: 1900,
+      },
+      CONFERENCE_WEIGHTS: {
+        "big-ten": 35,
+        sec: 35,
+        acc: 35,
+        "big-12": 35,
+        "big-east": 35,
+      },
+      CLOSE_GAME_RULES: {
+        closeMargin: 8,
+        firstHalfCloseMultiplier: 0.25,
+        closeLateMargin: 5,
+        closeLateMinutesLeft: 8,
+      },
+      BLOWOUT_RULES: {
+        blowoutMargin: 22,
+      },
+      UPCOMING_TIPOFF_PROXIMITY: {
+        enabled: true,
+        horizonMinutes: 420,
+        maxBonus: 160,
+      },
+      PROGRESS_BOOST: {
+        enabled: true,
+        maxClockProgressBonus: 150,
+        overtimeBonus: 120,
+      },
+      FINAL_HOLD: {
+        enabled: true,
+        holdMinutes: 3,
+        maxBonus: 850,
+      },
+    }
+  ),
+  createWeightPreset(
+    "close-game-drama",
+    "Close Late Drama",
+    "Designed for nail-biters: tight late games rise quickly, especially near the end of regulation.",
+    {
+      STATUS_WEIGHTS: {
+        LIVE: 1720,
+        UPCOMING: 560,
+        FINAL: 35,
+      },
+      BONUS_WEIGHTS: {
+        rankedGame: 220,
+        bothTeamsRanked: 280,
+        closeGame: 210,
+        closeLateGame: 760,
+      },
+      PENALTY_WEIGHTS: {
+        finalGame: 260,
+        liveBlowout: 300,
+        liveLowInterest: 230,
+      },
+      TEAM_WEIGHTS: {
+        michigan: 1700,
+      },
+      CONFERENCE_WEIGHTS: {
+        "big-ten": 40,
+        sec: 40,
+        acc: 40,
+        "big-12": 40,
+        "big-east": 40,
+      },
+      CLOSE_GAME_RULES: {
+        closeMargin: 8,
+        firstHalfCloseMultiplier: 0.2,
+        closeLateMargin: 6,
+        closeLateMinutesLeft: 10,
+      },
+      BLOWOUT_RULES: {
+        blowoutMargin: 18,
+      },
+      UPCOMING_TIPOFF_PROXIMITY: {
+        enabled: true,
+        horizonMinutes: 240,
+        maxBonus: 100,
+      },
+      PROGRESS_BOOST: {
+        enabled: true,
+        maxClockProgressBonus: 220,
+        overtimeBonus: 170,
+      },
+      FINAL_HOLD: {
+        enabled: true,
+        holdMinutes: 3,
+        maxBonus: 1000,
+      },
+    }
+  ),
+];
 
 export const CONFIG = {
   API: {

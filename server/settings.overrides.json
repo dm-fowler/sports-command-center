@@ -1,0 +1,72 @@
+{
+  "API": {
+    "REFRESH_INTERVAL_MS": 3000
+  },
+  "TICKER": {
+    "enabled": true,
+    "cycleIntervalMs": 5000
+  },
+  "BOTTOM_ROW_ROTATOR": {
+    "enabled": false,
+    "cycleIntervalMs": 8000,
+    "fadeMs": 450
+  },
+  "TV_LAYOUT": {
+    "enabled": true,
+    "autoGridFromMaxVisible": false,
+    "columns": 4,
+    "rows": 4,
+    "maxVisibleGames": 16
+  },
+  "STATUS_WEIGHTS": {
+    "LIVE": 1700,
+    "UPCOMING": 650,
+    "FINAL": 40,
+    "UNKNOWN": 0
+  },
+  "BONUS_WEIGHTS": {
+    "rankedGame": 240,
+    "bothTeamsRanked": 320,
+    "closeGame": 170,
+    "closeLateGame": 520
+  },
+  "PENALTY_WEIGHTS": {
+    "finalGame": 200,
+    "liveBlowout": 260,
+    "liveLowInterest": 180
+  },
+  "CLOSE_GAME_RULES": {
+    "closeMargin": 8,
+    "firstHalfCloseMultiplier": 0.35,
+    "closeLateMargin": 6,
+    "closeLateMinutesLeft": 8
+  },
+  "BLOWOUT_RULES": {
+    "blowoutMargin": 20
+  },
+  "UPCOMING_TIPOFF_PROXIMITY": {
+    "enabled": true,
+    "horizonMinutes": 360,
+    "maxBonus": 120
+  },
+  "FINAL_HOLD": {
+    "enabled": true,
+    "holdMinutes": 3,
+    "maxBonus": 950
+  },
+  "PROGRESS_BOOST": {
+    "enabled": true,
+    "maxClockProgressBonus": 130,
+    "overtimeBonus": 120
+  },
+  "TEAM_WEIGHTS": {
+    "michigan": 2400
+  },
+  "CONFERENCE_WEIGHTS": {
+    "big-ten": 50,
+    "sec": 50,
+    "acc": 50,
+    "big-12": 50,
+    "big-east": 50
+  }
+}

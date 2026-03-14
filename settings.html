@@ -32,6 +32,21 @@
         </section>
 
         <section class="settings-card">
+          <h2>Weight Presets</h2>
+          <p class="helper">
+            Start with a preset profile, then fine-tune below. Your current setup is saved as "My Custom (Current)".
+          </p>
+          <div class="preset-controls">
+            <label>
+              Choose Preset
+              <select id="weightPresetSelect"></select>
+            </label>
+            <button type="button" id="applyPresetButton" class="btn">Load Preset Into Form</button>
+          </div>
+          <p id="weightPresetDescription" class="field-note">Pick a preset to see details.</p>
+        </section>
+
+        <section class="settings-card">
           <h2>Quick Controls (Most Used)</h2>
           <p class="helper">These are the settings you will usually change first.</p>
           <div class="field-grid">
@@ -126,16 +141,13 @@
               Enable Live Progress Boost
             </label>
             <label>
-              2nd Half Progress Bonus
-              <input id="progressSecondHalfBonus" type="number" step="1" />
-            </label>
-            <label>
-              Overtime Progress Bonus
-              <input id="progressOvertimeBonus" type="number" step="1" />
-            </label>
-            <label>
               Clock Progress Bonus (max)
               <input id="progressMaxClockBonus" type="number" step="1" />
+              <span class="field-note">Higher value gives bigger boost to games closer to ending.</span>
+            </label>
+            <label>
+              Overtime Extra Bonus
+              <input id="progressOvertimeBonus" type="number" step="1" />
             </label>
           </div>
         </section>
@@ -147,6 +159,11 @@
             <label>
               Close Margin
               <input id="closeMargin" type="number" min="0" step="1" />
+            </label>
+            <label>
+              1st Half Close Multiplier
+              <input id="closeFirstHalfMultiplier" type="number" min="0" max="1" step="0.05" />
+              <span class="field-note">Example: 0.35 means first-half close bonus is 35% strength.</span>
             </label>
             <label>
               Close Late Margin

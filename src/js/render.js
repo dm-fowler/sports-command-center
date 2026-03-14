@@ -525,6 +525,12 @@ function createTeamRow() {
 
   const name = document.createElement("p");
   name.className = "team-name";
+  const nameMain = document.createElement("span");
+  nameMain.className = "team-name__main";
+  const nameRecord = document.createElement("span");
+  nameRecord.className = "team-name__record team-name__record--hidden";
+  name.appendChild(nameMain);
+  name.appendChild(nameRecord);
 
   const info = document.createElement("p");
   info.className = "team-info";
@@ -545,6 +551,8 @@ function createTeamRow() {
     logoImage,
     logoFallback,
     name,
+    nameMain,
+    nameRecord,
     info,
     score,
   };
@@ -553,15 +561,15 @@ function createTeamRow() {
 function updateTeamRow(teamRowRefs, team, gameStatus) {
   updateTeamLogo(teamRowRefs, team);
   teamRowRefs.logoFallback.textContent = getTeamInitials(team.name);
-  teamRowRefs.name.textContent = hasRank(team) ? `#${team.rank} ${team.name}` : team.name;
-  const teamInfo = buildTeamInfoLine(team);
-  teamRowRefs.info.textContent = teamInfo;
-
-  if (teamInfo) {
-    teamRowRefs.info.classList.remove("team-info--hidden");
+  teamRowRefs.nameMain.textContent = hasRank(team) ? `#${team.rank} ${team.name}` : team.name;
+  teamRowRefs.nameRecord.textContent = team.record ? `(${team.record})` : "";
+  if (team.record) {
+    teamRowRefs.nameRecord.classList.remove("team-name__record--hidden");
   } else {
-    teamRowRefs.info.classList.add("team-info--hidden");
+    teamRowRefs.nameRecord.classList.add("team-name__record--hidden");
   }
+  teamRowRefs.info.textContent = "";
+  teamRowRefs.info.classList.add("team-info--hidden");
 
   // Hide pregame scores for UPCOMING games so cards show matchup + tipoff cleanly.
   if (gameStatus === "UPCOMING") {
@@ -683,10 +691,6 @@ function applyCardOrder(gamesGrid, orderedCards) {
 
     gamesGrid.insertBefore(card, currentNode);
   });
-}
-
-function buildTeamInfoLine(team) {
-  return safeText(team.record, "");
 }
 
 function buildCardRenderSignature(game) {

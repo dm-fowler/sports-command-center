@@ -98,7 +98,7 @@ export function calculateImportanceScore(game) {
     {
       key: "closeGame",
       isActive: () => isCloseGame(game),
-      value: () => CONFIG.BONUS_WEIGHTS.closeGame,
+      value: () => getCloseGameBonus(game),
       flag: "isCloseGame",
     },
     {
@@ -351,6 +351,26 @@ function isCloseGame(game) {
   return margin <= CONFIG.CLOSE_GAME_RULES.closeMargin;
 }
 
+function getCloseGameBonus(game) {
+  if (!isCloseGame(game)) {
+    return 0;
+  }
+
+  const baseBonus = toNumber(CONFIG.BONUS_WEIGHTS.closeGame, 0);
+  if (!Number.isFinite(baseBonus) || baseBonus <= 0) {
+    return 0;
+  }
+
+  const periodType = getPeriodType(game.statusDetail);
+  const firstHalfMultiplier = toNumber(CONFIG.CLOSE_GAME_RULES.firstHalfCloseMultiplier, 1);
+  const multiplier =
+    periodType === "FIRST_HALF"
+      ? clamp(firstHalfMultiplier, 0, 1)
+      : 1;
+
+  return Math.round(baseBonus * multiplier);
+}
+
 function isCloseLateGame(game) {
   if (game.status !== "LIVE") {
     return false;
@@ -431,23 +451,45 @@ function getLiveProgressWeight(game) {
     return 0;
   }
 
+  const clockSeconds = parseClockToSeconds(game.clock);
+  const maxClockProgressBonus = Math.max(
+    0,
+    Math.round(toNumber(progressConfig.maxClockProgressBonus, 0))
+  );
+
+  // Use a clock-based progress score so games nearer the end naturally rise.
   let bonus = 0;
+  if (Number.isFinite(clockSeconds) && maxClockProgressBonus > 0) {
+    const elapsedSeconds = getElapsedGameSeconds(periodType, clockSeconds);
+    const regulationSeconds = 40 * 60;
+    const progressFraction = clamp(elapsedSeconds / regulationSeconds, 0, 1);
+    bonus += Math.round(progressFraction * maxClockProgressBonus);
+  }
+
+  if (periodType === "OVERTIME") {
+    bonus += Math.max(0, Math.round(toNumber(progressConfig.overtimeBonus, 0)));
+  }
+
+  return bonus;
+}
+
+function getElapsedGameSeconds(periodType, clockSeconds) {
+  const halfSeconds = 20 * 60;
+  const overtimeSeconds = 5 * 60;
+
+  if (periodType === "FIRST_HALF") {
+    return halfSeconds - clockSeconds;
+  }
 
   if (periodType === "SECOND_HALF") {
-    bonus += progressConfig.secondHalfBonus;
-  } else if (periodType === "OVERTIME") {
-    bonus += progressConfig.overtimeBonus;
+    return halfSeconds + (halfSeconds - clockSeconds);
   }
 
-  const periodSeconds = getPeriodDurationSeconds(periodType, progressConfig);
-  const clockSeconds = parseClockToSeconds(game.clock);
-
-  if (periodSeconds > 0 && Number.isFinite(clockSeconds)) {
-    const elapsedFraction = clamp((periodSeconds - clockSeconds) / periodSeconds, 0, 1);
-    bonus += Math.round(elapsedFraction * progressConfig.maxClockProgressBonus);
+  if (periodType === "OVERTIME") {
+    return halfSeconds * 2 + (overtimeSeconds - clockSeconds);
   }
 
-  return Math.max(0, Math.round(bonus));
+  return 0;
 }
 
 function hasPreferredTeamGame(game) {
@@ -486,22 +528,6 @@ function getPeriodType(statusDetail) {
   }
 
   return "UNKNOWN";
-}
-
-function getPeriodDurationSeconds(periodType, progressConfig) {
-  if (periodType === "FIRST_HALF") {
-    return progressConfig.firstHalfMinutes * 60;
-  }
-
-  if (periodType === "SECOND_HALF") {
-    return progressConfig.secondHalfMinutes * 60;
-  }
-
-  if (periodType === "OVERTIME") {
-    return progressConfig.overtimeMinutes * 60;
-  }
-
-  return 0;
 }
 
 function parseClockToSeconds(clockText) {
