@@ -86,19 +86,19 @@
           "round-of-64": [
             "Duke",
             "TCU",
-            "Northern Iowa",
+            "UNI",
             "Kansas",
-            "South Florida",
-            "Michigan St",
+            "South Fla.",
+            "Michigan St.",
             "UCLA",
             "UConn",
             "Arizona",
-            "Utah St",
+            "Utah St.",
             "Wisconsin",
             "Arkansas",
             "BYU",
             "Gonzaga",
-            "Miami Fla",
+            "Miami (FL)",
             "Purdue",
             "Florida",
             "Iowa",
@@ -106,21 +106,21 @@
             "Troy",
             "VCU",
             "Illinois",
-            "St Marys",
+            "Saint Mary's (CA)",
             "Houston",
             "Michigan",
             "Saint Louis",
             "Texas Tech",
             "Hofstra",
-            "Miami Ohio",
+            "Miami (OH)",
             "Virginia",
             "Santa Clara",
-            "Iowa St"
+            "Iowa St."
           ],
           "round-of-32": [
             "Duke",
             "Kansas",
-            "South Florida",
+            "South Fla.",
             "UConn",
             "Arizona",
             "Arkansas",
@@ -133,7 +133,7 @@
             "Michigan",
             "Texas Tech",
             "Virginia",
-            "Iowa St"
+            "Iowa St."
           ],
           "sweet-16": [
             "Duke",
@@ -167,11 +167,11 @@
         "picksByRound": {
           "round-of-64": [
             "Duke",
-            "Ohio St",
-            "St Johns",
-            "Cal Baptist",
+            "Ohio St.",
+            "St. John's (NY)",
+            "California Baptist",
             "Louisville",
-            "North Dakota St",
+            "North Dakota St.",
             "UCLA",
             "UConn",
             "Arizona",
@@ -188,7 +188,7 @@
             "Nebraska",
             "North Carolina",
             "Penn",
-            "St Marys",
+            "Saint Mary's (CA)",
             "Houston",
             "Michigan",
             "Georgia",
@@ -197,11 +197,11 @@
             "Tennessee",
             "Virginia",
             "Santa Clara",
-            "Iowa St"
+            "Iowa St."
           ],
           "round-of-32": [
-            "Ohio St",
-            "St Johns",
+            "Ohio St.",
+            "St. John's (NY)",
             "Louisville",
             "UCLA",
             "Arizona",
@@ -215,10 +215,10 @@
             "Georgia",
             "Hofstra",
             "Tennessee",
-            "Iowa St"
+            "Iowa St."
           ],
           "sweet-16": [
-            "St Johns",
+            "St. John's (NY)",
             "Louisville",
             "Arizona",
             "Purdue",
@@ -249,20 +249,20 @@
         "picksByRound": {
           "round-of-64": [
             "Duke",
-            "Ohio St",
-            "St Johns",
+            "Ohio St.",
+            "St. John's (NY)",
             "Kansas",
             "Louisville",
-            "Michigan St",
+            "Michigan St.",
             "UCLA",
             "UConn",
             "Arizona",
-            "Utah St",
+            "Utah St.",
             "Wisconsin",
             "Arkansas",
             "BYU",
             "Gonzaga",
-            "Miami Fla",
+            "Miami (FL)",
             "Purdue",
             "Florida",
             "Iowa",
@@ -279,12 +279,12 @@
             "Tennessee",
             "Virginia",
             "Kentucky",
-            "Iowa St"
+            "Iowa St."
           ],
           "round-of-32": [
             "Duke",
             "Kansas",
-            "Michigan St",
+            "Michigan St.",
             "UCLA",
             "Arizona",
             "Wisconsin",
@@ -297,11 +297,11 @@
             "Michigan",
             "Alabama",
             "Virginia",
-            "Iowa St"
+            "Iowa St."
           ],
           "sweet-16": [
             "Duke",
-            "Michigan St",
+            "Michigan St.",
             "Arizona",
             "Gonzaga",
             "Florida",
@@ -332,14 +332,14 @@
           "round-of-64": [
             "Duke",
             "TCU",
-            "St Johns",
+            "St. John's (NY)",
             "Kansas",
-            "South Florida",
-            "Michigan St",
+            "South Fla.",
+            "Michigan St.",
             "UCLA",
             "UConn",
             "Arizona",
-            "Utah St",
+            "Utah St.",
             "Wisconsin",
             "Arkansas",
             "Texas",
@@ -361,12 +361,12 @@
             "Tennessee",
             "Virginia",
             "Santa Clara",
-            "Iowa St"
+            "Iowa St."
           ],
           "round-of-32": [
             "Duke",
-            "St Johns",
-            "Michigan St",
+            "St. John's (NY)",
+            "Michigan St.",
             "UCLA",
             "Arizona",
             "Wisconsin",
@@ -379,23 +379,23 @@
             "Michigan",
             "Hofstra",
             "Virginia",
-            "Iowa St"
+            "Iowa St."
           ],
           "sweet-16": [
             "Duke",
-            "Michigan St",
+            "Michigan St.",
             "Arizona",
             "Gonzaga",
             "Florida",
             "Houston",
             "Michigan",
-            "Iowa St"
+            "Iowa St."
           ],
           "elite-8": [
             "Duke",
             "Arizona",
             "Florida",
-            "Iowa St"
+            "Iowa St."
           ],
           "final-four": [
             "Duke",
