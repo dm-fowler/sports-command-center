@@ -18,6 +18,12 @@
     "rows": 4,
     "maxVisibleGames": 16
   },
+  "GAME_FILTERS": {
+    "marchMadnessOnly": true,
+    "marchMadnessChampionshipIds": [
+      6393
+    ]
+  },
   "STATUS_WEIGHTS": {
     "LIVE": 1700,
     "UPCOMING": 650,
@@ -68,5 +74,353 @@
     "acc": 50,
     "big-12": 50,
     "big-east": 50
+  },
+  "BRACKET_ROOTING": {
+    "enabled": true,
+    "brackets": [
+      {
+        "id": "gimmie-dat-tschetter",
+        "name": "Gimmie dat Tschetter",
+        "color": "#ffd400",
+        "picksByRound": {
+          "round-of-64": [
+            "Duke",
+            "TCU",
+            "Northern Iowa",
+            "Kansas",
+            "South Florida",
+            "Michigan St",
+            "UCLA",
+            "UConn",
+            "Arizona",
+            "Utah St",
+            "Wisconsin",
+            "Arkansas",
+            "BYU",
+            "Gonzaga",
+            "Miami Fla",
+            "Purdue",
+            "Florida",
+            "Iowa",
+            "Vanderbilt",
+            "Troy",
+            "VCU",
+            "Illinois",
+            "St Marys",
+            "Houston",
+            "Michigan",
+            "Saint Louis",
+            "Texas Tech",
+            "Hofstra",
+            "Miami Ohio",
+            "Virginia",
+            "Santa Clara",
+            "Iowa St"
+          ],
+          "round-of-32": [
+            "Duke",
+            "Kansas",
+            "South Florida",
+            "UConn",
+            "Arizona",
+            "Arkansas",
+            "Gonzaga",
+            "Purdue",
+            "Florida",
+            "Vanderbilt",
+            "Illinois",
+            "Houston",
+            "Michigan",
+            "Texas Tech",
+            "Virginia",
+            "Iowa St"
+          ],
+          "sweet-16": [
+            "Duke",
+            "UConn",
+            "Arizona",
+            "Gonzaga",
+            "Vanderbilt",
+            "Houston",
+            "Michigan",
+            "Virginia"
+          ],
+          "elite-8": [
+            "Duke",
+            "Arizona",
+            "Houston",
+            "Michigan"
+          ],
+          "final-four": [
+            "Duke",
+            "Michigan"
+          ],
+          "championship": [
+            "Michigan"
+          ]
+        }
+      },
+      {
+        "id": "ozzy-bracket",
+        "name": "Ozzy Bracket",
+        "color": "#30d158",
+        "picksByRound": {
+          "round-of-64": [
+            "Duke",
+            "Ohio St",
+            "St Johns",
+            "Cal Baptist",
+            "Louisville",
+            "North Dakota St",
+            "UCLA",
+            "UConn",
+            "Arizona",
+            "Villanova",
+            "Wisconsin",
+            "Hawaii",
+            "Texas",
+            "Gonzaga",
+            "Missouri",
+            "Purdue",
+            "Florida",
+            "Iowa",
+            "McNeese",
+            "Nebraska",
+            "North Carolina",
+            "Penn",
+            "St Marys",
+            "Houston",
+            "Michigan",
+            "Georgia",
+            "Texas Tech",
+            "Hofstra",
+            "Tennessee",
+            "Virginia",
+            "Santa Clara",
+            "Iowa St"
+          ],
+          "round-of-32": [
+            "Ohio St",
+            "St Johns",
+            "Louisville",
+            "UCLA",
+            "Arizona",
+            "Wisconsin",
+            "Gonzaga",
+            "Purdue",
+            "Florida",
+            "Nebraska",
+            "Penn",
+            "Houston",
+            "Georgia",
+            "Hofstra",
+            "Tennessee",
+            "Iowa St"
+          ],
+          "sweet-16": [
+            "St Johns",
+            "Louisville",
+            "Arizona",
+            "Purdue",
+            "Florida",
+            "Houston",
+            "Georgia",
+            "Tennessee"
+          ],
+          "elite-8": [
+            "Louisville",
+            "Arizona",
+            "Florida",
+            "Tennessee"
+          ],
+          "final-four": [
+            "Florida",
+            "Tennessee"
+          ],
+          "championship": [
+            "Florida"
+          ]
+        }
+      },
+      {
+        "id": "melina-bracket",
+        "name": "Melina Bracket",
+        "color": "#ff6b6b",
+        "picksByRound": {
+          "round-of-64": [
+            "Duke",
+            "Ohio St",
+            "St Johns",
+            "Kansas",
+            "Louisville",
+            "Michigan St",
+            "UCLA",
+            "UConn",
+            "Arizona",
+            "Utah St",
+            "Wisconsin",
+            "Arkansas",
+            "BYU",
+            "Gonzaga",
+            "Miami Fla",
+            "Purdue",
+            "Florida",
+            "Iowa",
+            "Vanderbilt",
+            "Nebraska",
+            "North Carolina",
+            "Illinois",
+            "Texas A&M",
+            "Houston",
+            "Michigan",
+            "Georgia",
+            "Texas Tech",
+            "Alabama",
+            "Tennessee",
+            "Virginia",
+            "Kentucky",
+            "Iowa St"
+          ],
+          "round-of-32": [
+            "Duke",
+            "Kansas",
+            "Michigan St",
+            "UCLA",
+            "Arizona",
+            "Wisconsin",
+            "Gonzaga",
+            "Purdue",
+            "Florida",
+            "Nebraska",
+            "Illinois",
+            "Houston",
+            "Michigan",
+            "Alabama",
+            "Virginia",
+            "Iowa St"
+          ],
+          "sweet-16": [
+            "Duke",
+            "Michigan St",
+            "Arizona",
+            "Gonzaga",
+            "Florida",
+            "Illinois",
+            "Michigan",
+            "Virginia"
+          ],
+          "elite-8": [
+            "Duke",
+            "Arizona",
+            "Illinois",
+            "Michigan"
+          ],
+          "final-four": [
+            "Duke",
+            "Michigan"
+          ],
+          "championship": [
+            "Michigan"
+          ]
+        }
+      },
+      {
+        "id": "overthinking-it-bracket",
+        "name": "Overthinking It Bracket",
+        "color": "#66b3ff",
+        "picksByRound": {
+          "round-of-64": [
+            "Duke",
+            "TCU",
+            "St Johns",
+            "Kansas",
+            "South Florida",
+            "Michigan St",
+            "UCLA",
+            "UConn",
+            "Arizona",
+            "Utah St",
+            "Wisconsin",
+            "Arkansas",
+            "Texas",
+            "Gonzaga",
+            "Missouri",
+            "Purdue",
+            "Florida",
+            "Iowa",
+            "Vanderbilt",
+            "Nebraska",
+            "VCU",
+            "Illinois",
+            "Texas A&M",
+            "Houston",
+            "Michigan",
+            "Saint Louis",
+            "Akron",
+            "Hofstra",
+            "Tennessee",
+            "Virginia",
+            "Santa Clara",
+            "Iowa St"
+          ],
+          "round-of-32": [
+            "Duke",
+            "St Johns",
+            "Michigan St",
+            "UCLA",
+            "Arizona",
+            "Wisconsin",
+            "Gonzaga",
+            "Missouri",
+            "Florida",
+            "Vanderbilt",
+            "Illinois",
+            "Houston",
+            "Michigan",
+            "Hofstra",
+            "Virginia",
+            "Iowa St"
+          ],
+          "sweet-16": [
+            "Duke",
+            "Michigan St",
+            "Arizona",
+            "Gonzaga",
+            "Florida",
+            "Houston",
+            "Michigan",
+            "Iowa St"
+          ],
+          "elite-8": [
+            "Duke",
+            "Arizona",
+            "Florida",
+            "Iowa St"
+          ],
+          "final-four": [
+            "Duke",
+            "Arizona"
+          ],
+          "championship": [
+            "Arizona"
+          ]
+        }
+      }
+    ],
+    "roundAliases": {
+      "first-round": "round-of-64",
+      "second-round": "round-of-32",
+      "round-of-64": "round-of-64",
+      "round-of-32": "round-of-32",
+      "sweet-16": "sweet-16",
+      "regional-semifinal": "sweet-16",
+      "elite-8": "elite-8",
+      "regional-final": "elite-8",
+      "final-four": "final-four",
+      "national-semifinal": "final-four",
+      "championship": "championship",
+      "national-championship": "championship",
+      "title-game": "championship"
+    }
   }
 }

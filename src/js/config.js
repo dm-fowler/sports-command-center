@@ -1,549 +1,69 @@
 // src/js/config.js
 // ------------------------------------------------------------
-// This file is your main control panel for the app.
-// Change values here to tune scoring, refresh speed, and preferences.
+// Main control panel for Sports Command Center.
+//
+// Edit the USER_SETTINGS block first.
+// Most users should never need to touch the advanced/internal section.
 // ------------------------------------------------------------
 
 const SETTINGS_SERVER_PORT = 3000;
 
-/**
- * Build a URL that points to the local settings/proxy server.
- * Uses current hostname so this works on Raspberry Pi and LAN devices.
- */
-function buildLocalServerUrl(path) {
-  const safePath = String(path ?? "").startsWith("/") ? path : `/${path}`;
-
-  if (typeof window === "undefined") {
-    return `http://localhost:${SETTINGS_SERVER_PORT}${safePath}`;
-  }
-
-  const protocol = window.location.protocol === "https:" ? "https:" : "http:";
-  const host = window.location.hostname || "localhost";
-  return `${protocol}//${host}:${SETTINGS_SERVER_PORT}${safePath}`;
-}
-
-function isPlainObject(value) {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function deepMergeMutable(target, source) {
-  if (!isPlainObject(target) || !isPlainObject(source)) {
-    return target;
-  }
-
-  Object.keys(source).forEach((key) => {
-    const sourceValue = source[key];
-    const targetValue = target[key];
-
-    if (isPlainObject(sourceValue) && isPlainObject(targetValue)) {
-      deepMergeMutable(targetValue, sourceValue);
-      return;
-    }
-
-    target[key] = sourceValue;
-  });
-
-  return target;
-}
-
 // ============================================================
-// QUICK_TUNE (EDIT HERE FIRST)
+// USER_SETTINGS (EDIT HERE)
 // ============================================================
-// Beginner shortcut:
-// Most day-to-day tuning should happen in this block.
-//
-// ------------------- SCORING CHEAT SHEET --------------------
-// Final score is built from:
-//   base status score
-// + team preference
-// + conference preference (higher side only)
-// + game situation boosts
-// - game situation penalties
-//
-// 1) STATUS_WEIGHTS (biggest driver)
-// - LIVE: baseline for all live games.
-// - UPCOMING: baseline for pre-tip games.
-// - FINAL: baseline for finished games.
-// If ordering feels wrong globally, tune this first.
-//
-// 2) TEAM_WEIGHTS + TEAM_PREFERENCE_RULES
-// - TEAM_WEIGHTS boosts your preferred teams.
-// - finalStatusMultiplier controls how much that boost remains once a game is FINAL.
-//   Example: 0 means preferred-team boost is removed after final.
-//
-// 3) CONFERENCE_WEIGHTS
-// - Adds a conference preference bonus.
-// - Uses only the higher conference weight from the two teams (not both added).
-//
-// 4) BONUS_WEIGHTS
-// - rankedGame: one ranked team.
-// - bothTeamsRanked: both ranked.
-// - closeGame: live margin <= closeMargin (scaled by firstHalfCloseMultiplier in 1st half).
-// - closeLateGame: live margin <= closeLateMargin AND clock <= closeLateMinutesLeft
-//   in 2nd half/OT.
-//
-// 5) PENALTY_WEIGHTS
-// - finalGame: final games are pushed down (except during final-hold window).
-// - liveBlowout: large-margin live games.
-// - liveLowInterest: live games with no ranked/close/preferred signals.
-//
-// 6) TIMING BOOSTS
-// - upcomingTipoffProximity: gradual boost as tipoff gets closer.
-// - progressBoost: clock-based live boost (later game clock state = higher score).
-//
-// 7) FINAL_HOLD
-// - Keeps newly final games visible briefly, then fades the boost out.
-//
-// Quick tune order:
-// 1) statusWeights  2) bonusWeights/penaltyWeights  3) closeGameRules
-// 4) teamWeights/conferenceWeights  5) tipoff/progress/finalHold
-// ============================================================
-const QUICK_TUNE = {
+const USER_SETTINGS = {
+  // Refresh + clock behavior
   refreshIntervalSeconds: 3,
   clockIntervalMs: 1000,
-
-  // Automatically pull saved settings from /settings/config.
-  // This removes the need for manual browser refresh after saving settings.
   settingsSyncSeconds: 5,
 
-  // TV layout sizing control:
-  // Change these values to control BOTH:
-  // 1) number of cards shown
-  // 2) card size
-  gridColumns: 4,
-  gridRows: 4,
-
-  statusWeights: {
-    LIVE: 1700,
-    UPCOMING: 650,
-    FINAL: 40,
-    UNKNOWN: 0,
-  },
-
-  conferenceWeights: {
-    "big-ten": 50,
-    sec: 50,
-    acc: 50,
-    "big-12": 50,
-    "big-east": 50,
-  },
-
-  teamWeights: {
-    // Michigan stays strongly preferred, but final games are reduced by status multiplier below.
-    michigan: 2400,
-  },
-
-  // Prevent preferred-team bonus from overpowering live/upcoming games once a game is FINAL.
-  teamPreferenceRules: {
-    finalStatusMultiplier: 0,
-  },
-
-  bonusWeights: {
-    rankedGame: 240,
-    bothTeamsRanked: 320,
-    closeGame: 170,
-    closeLateGame: 520,
-  },
-
-  penaltyWeights: {
-    finalGame: 200,
-    liveBlowout: 260,
-    liveLowInterest: 180,
-  },
-
-  // Keep newly final games on-screen for a short window, then let them drop.
-  finalHold: {
+  // TV layout
+  layout: {
+    columns: 4,
+    rows: 4,
+    gapPx: 10,
+    outerPaddingPx: 10,
+    tickerHeightPx: 46,
+    targetCardAspectRatio: 1.4,
+    autoGridFromMaxVisible: false,
     enabled: true,
-    holdMinutes: 3,
-    maxBonus: 950,
   },
 
-  closeGameRules: {
-    closeMargin: 8,
-    firstHalfCloseMultiplier: 0.15,
-    closeLateMargin: 8,
-    closeLateMinutesLeft: 5,
-  },
-
-  blowoutRules: {
-    blowoutMargin: 20,
-  },
-
-  // Gradual upcoming-game bonus: closer tipoff => higher score.
-  // This replaces custom sorting overrides with a visible score component.
-  upcomingTipoffProximity: {
+  // Ticker + bottom-row rotator
+  ticker: {
     enabled: true,
-    horizonMinutes: 360,
-    maxBonus: 120,
+    cycleIntervalMs: 4500,
   },
-
-  progressBoost: {
-    enabled: true,
-    // Clock-based progress bonus from game start to end of regulation.
-    maxClockProgressBonus: 350,
-    // Optional extra boost for overtime games.
-    overtimeBonus: 120,
-  },
-
-  // Optional mode: replace bottom ticker with rotating final row of cards.
   rotatingBottomRow: {
     enabled: false,
     cycleSeconds: 8,
     fadeMs: 450,
   },
-};
 
-function createWeightPreset(id, label, description, overrides) {
-  return {
-    id,
-    label,
-    description,
-    overrides,
-  };
-}
-
-/**
- * Weight presets for fast tuning profiles from the Settings page.
- * - "custom-current" preserves your current hand-tuned setup.
- * - Other presets provide different viewing styles.
- */
-export const WEIGHT_PRESETS = [
-  createWeightPreset(
-    "custom-current",
-    "My Custom (Current)",
-    "Your current tuned weights with Michigan preference and balanced live/ranked/close behavior.",
-    {
-      STATUS_WEIGHTS: {
-        LIVE: QUICK_TUNE.statusWeights.LIVE,
-        UPCOMING: QUICK_TUNE.statusWeights.UPCOMING,
-        FINAL: QUICK_TUNE.statusWeights.FINAL,
-      },
-      BONUS_WEIGHTS: {
-        rankedGame: QUICK_TUNE.bonusWeights.rankedGame,
-        bothTeamsRanked: QUICK_TUNE.bonusWeights.bothTeamsRanked,
-        closeGame: QUICK_TUNE.bonusWeights.closeGame,
-        closeLateGame: QUICK_TUNE.bonusWeights.closeLateGame,
-      },
-      PENALTY_WEIGHTS: {
-        finalGame: QUICK_TUNE.penaltyWeights.finalGame,
-        liveBlowout: QUICK_TUNE.penaltyWeights.liveBlowout,
-        liveLowInterest: QUICK_TUNE.penaltyWeights.liveLowInterest,
-      },
-      TEAM_WEIGHTS: { ...QUICK_TUNE.teamWeights },
-      CONFERENCE_WEIGHTS: { ...QUICK_TUNE.conferenceWeights },
-      CLOSE_GAME_RULES: {
-        closeMargin: QUICK_TUNE.closeGameRules.closeMargin,
-        firstHalfCloseMultiplier: QUICK_TUNE.closeGameRules.firstHalfCloseMultiplier,
-        closeLateMargin: QUICK_TUNE.closeGameRules.closeLateMargin,
-        closeLateMinutesLeft: QUICK_TUNE.closeGameRules.closeLateMinutesLeft,
-      },
-      BLOWOUT_RULES: {
-        blowoutMargin: QUICK_TUNE.blowoutRules.blowoutMargin,
-      },
-      UPCOMING_TIPOFF_PROXIMITY: {
-        enabled: QUICK_TUNE.upcomingTipoffProximity.enabled,
-        horizonMinutes: QUICK_TUNE.upcomingTipoffProximity.horizonMinutes,
-        maxBonus: QUICK_TUNE.upcomingTipoffProximity.maxBonus,
-      },
-      PROGRESS_BOOST: {
-        enabled: QUICK_TUNE.progressBoost.enabled,
-        maxClockProgressBonus: QUICK_TUNE.progressBoost.maxClockProgressBonus,
-        overtimeBonus: QUICK_TUNE.progressBoost.overtimeBonus,
-      },
-      FINAL_HOLD: {
-        enabled: QUICK_TUNE.finalHold.enabled,
-        holdMinutes: QUICK_TUNE.finalHold.holdMinutes,
-        maxBonus: QUICK_TUNE.finalHold.maxBonus,
-      },
-    }
-  ),
-  createWeightPreset(
-    "balanced-national",
-    "Balanced National",
-    "Good all-around profile: live games lead, ranked matchups matter, and conference bias is minimal.",
-    {
-      STATUS_WEIGHTS: {
-        LIVE: 1650,
-        UPCOMING: 620,
-        FINAL: 40,
-      },
-      BONUS_WEIGHTS: {
-        rankedGame: 300,
-        bothTeamsRanked: 380,
-        closeGame: 140,
-        closeLateGame: 420,
-      },
-      PENALTY_WEIGHTS: {
-        finalGame: 260,
-        liveBlowout: 240,
-        liveLowInterest: 220,
-      },
-      TEAM_WEIGHTS: {
-        michigan: 1800,
-      },
-      CONFERENCE_WEIGHTS: {
-        "big-ten": 45,
-        sec: 45,
-        acc: 45,
-        "big-12": 45,
-        "big-east": 45,
-      },
-      CLOSE_GAME_RULES: {
-        closeMargin: 8,
-        firstHalfCloseMultiplier: 0.3,
-        closeLateMargin: 6,
-        closeLateMinutesLeft: 8,
-      },
-      BLOWOUT_RULES: {
-        blowoutMargin: 20,
-      },
-      UPCOMING_TIPOFF_PROXIMITY: {
-        enabled: true,
-        horizonMinutes: 300,
-        maxBonus: 120,
-      },
-      PROGRESS_BOOST: {
-        enabled: true,
-        maxClockProgressBonus: 180,
-        overtimeBonus: 140,
-      },
-      FINAL_HOLD: {
-        enabled: true,
-        holdMinutes: 3,
-        maxBonus: 900,
-      },
-    }
-  ),
-  createWeightPreset(
-    "live-chaos",
-    "Live Game Heavy",
-    "Prioritizes what is happening now. Upcoming games almost never jump over active live games.",
-    {
-      STATUS_WEIGHTS: {
-        LIVE: 1900,
-        UPCOMING: 420,
-        FINAL: 30,
-      },
-      BONUS_WEIGHTS: {
-        rankedGame: 220,
-        bothTeamsRanked: 300,
-        closeGame: 120,
-        closeLateGame: 360,
-      },
-      PENALTY_WEIGHTS: {
-        finalGame: 300,
-        liveBlowout: 260,
-        liveLowInterest: 240,
-      },
-      TEAM_WEIGHTS: {
-        michigan: 1700,
-      },
-      CONFERENCE_WEIGHTS: {
-        "big-ten": 40,
-        sec: 40,
-        acc: 40,
-        "big-12": 40,
-        "big-east": 40,
-      },
-      CLOSE_GAME_RULES: {
-        closeMargin: 7,
-        firstHalfCloseMultiplier: 0.2,
-        closeLateMargin: 5,
-        closeLateMinutesLeft: 7,
-      },
-      BLOWOUT_RULES: {
-        blowoutMargin: 18,
-      },
-      UPCOMING_TIPOFF_PROXIMITY: {
-        enabled: true,
-        horizonMinutes: 180,
-        maxBonus: 80,
-      },
-      PROGRESS_BOOST: {
-        enabled: true,
-        maxClockProgressBonus: 240,
-        overtimeBonus: 180,
-      },
-      FINAL_HOLD: {
-        enabled: true,
-        holdMinutes: 2,
-        maxBonus: 700,
-      },
-    }
-  ),
-  createWeightPreset(
-    "ranked-marquee",
-    "Ranked Matchups",
-    "Boosts ranked games heavily, useful when you care most about top-25 and high-profile games.",
-    {
-      STATUS_WEIGHTS: {
-        LIVE: 1680,
-        UPCOMING: 720,
-        FINAL: 40,
-      },
-      BONUS_WEIGHTS: {
-        rankedGame: 520,
-        bothTeamsRanked: 700,
-        closeGame: 110,
-        closeLateGame: 360,
-      },
-      PENALTY_WEIGHTS: {
-        finalGame: 240,
-        liveBlowout: 220,
-        liveLowInterest: 260,
-      },
-      TEAM_WEIGHTS: {
-        michigan: 1900,
-      },
-      CONFERENCE_WEIGHTS: {
-        "big-ten": 35,
-        sec: 35,
-        acc: 35,
-        "big-12": 35,
-        "big-east": 35,
-      },
-      CLOSE_GAME_RULES: {
-        closeMargin: 8,
-        firstHalfCloseMultiplier: 0.25,
-        closeLateMargin: 5,
-        closeLateMinutesLeft: 8,
-      },
-      BLOWOUT_RULES: {
-        blowoutMargin: 22,
-      },
-      UPCOMING_TIPOFF_PROXIMITY: {
-        enabled: true,
-        horizonMinutes: 420,
-        maxBonus: 160,
-      },
-      PROGRESS_BOOST: {
-        enabled: true,
-        maxClockProgressBonus: 150,
-        overtimeBonus: 120,
-      },
-      FINAL_HOLD: {
-        enabled: true,
-        holdMinutes: 3,
-        maxBonus: 850,
-      },
-    }
-  ),
-  createWeightPreset(
-    "close-game-drama",
-    "Close Late Drama",
-    "Designed for nail-biters: tight late games rise quickly, especially near the end of regulation.",
-    {
-      STATUS_WEIGHTS: {
-        LIVE: 1720,
-        UPCOMING: 560,
-        FINAL: 35,
-      },
-      BONUS_WEIGHTS: {
-        rankedGame: 220,
-        bothTeamsRanked: 280,
-        closeGame: 210,
-        closeLateGame: 760,
-      },
-      PENALTY_WEIGHTS: {
-        finalGame: 260,
-        liveBlowout: 300,
-        liveLowInterest: 230,
-      },
-      TEAM_WEIGHTS: {
-        michigan: 1700,
-      },
-      CONFERENCE_WEIGHTS: {
-        "big-ten": 40,
-        sec: 40,
-        acc: 40,
-        "big-12": 40,
-        "big-east": 40,
-      },
-      CLOSE_GAME_RULES: {
-        closeMargin: 8,
-        firstHalfCloseMultiplier: 0.2,
-        closeLateMargin: 6,
-        closeLateMinutesLeft: 10,
-      },
-      BLOWOUT_RULES: {
-        blowoutMargin: 18,
-      },
-      UPCOMING_TIPOFF_PROXIMITY: {
-        enabled: true,
-        horizonMinutes: 240,
-        maxBonus: 100,
-      },
-      PROGRESS_BOOST: {
-        enabled: true,
-        maxClockProgressBonus: 220,
-        overtimeBonus: 170,
-      },
-      FINAL_HOLD: {
-        enabled: true,
-        holdMinutes: 3,
-        maxBonus: 1000,
-      },
-    }
-  ),
-];
-
-export const CONFIG = {
-  API: {
-    // Use local proxy to avoid browser CORS blocks.
-    // Run server/server.js so this URL is available.
-    BASE_URL: buildLocalServerUrl("/api"),
-    SPORT: "basketball-men",
-    DIVISION_PATH: "d1",
-    REQUEST_TIMEOUT_MS: 8000,
-    REFRESH_INTERVAL_MS: QUICK_TUNE.refreshIntervalSeconds * 1000,
+  // Display timezone
+  display: {
+    timeZone: "America/Chicago",
+    timeLabel: "CT",
   },
 
-  SETTINGS_SYNC: {
-    enabled: true,
-    pollIntervalMs: QUICK_TUNE.settingsSyncSeconds * 1000,
+  // Game filtering
+  gameFilters: {
+    // When true, show only NCAA tournament-style games.
+    // Logic uses bracketRound + both team seeds + championship id check.
+    marchMadnessOnly: true,
+    // Current NCAA tournament championship id (observed from API).
+    // Keep as an array so you can add ids later if needed.
+    marchMadnessChampionshipIds: [6393],
   },
 
-  CLOCK_INTERVAL_MS: QUICK_TUNE.clockIntervalMs,
-
-  // TV-first layout settings (55" 1080p target).
-  // In this mode, rows/columns are the source of truth.
-  // maxVisibleGames is derived automatically from rows * columns.
-  TV_LAYOUT: {
-    enabled: true,
-    autoGridFromMaxVisible: false,
-    gapPx: 10,
-    outerPaddingPx: 10,
-    tickerHeightPx: 46,
-    targetCardAspectRatio: 1.4,
-    maxVisibleGames: QUICK_TUNE.gridColumns * QUICK_TUNE.gridRows,
-    // Used only when autoGridFromMaxVisible is false.
-    columns: QUICK_TUNE.gridColumns,
-    rows: QUICK_TUNE.gridRows,
-  },
-
-  // ESPN-style bottom ticker behavior.
-  TICKER: {
-    enabled: true,
-    cycleIntervalMs: 4500,
-  },
-
-  // If enabled, this mode hides ticker and rotates games through the bottom row.
-  BOTTOM_ROW_ROTATOR: {
-    enabled: QUICK_TUNE.rotatingBottomRow.enabled,
-    cycleIntervalMs: QUICK_TUNE.rotatingBottomRow.cycleSeconds * 1000,
-    fadeMs: QUICK_TUNE.rotatingBottomRow.fadeMs,
-  },
-
-  // Team logo options.
-  TEAM_BRANDING: {
-    // Local logos from assets/logos are fastest and most reliable for Pi setups.
-    LOCAL_LOGOS_ENABLED: true,
-    PREFER_LOCAL_LOGOS: true,
-    LOCAL_LOGO_CATALOG_URL: buildLocalServerUrl("/logos/catalog"),
-    // Optional manual fixes for teams with ambiguous names.
-    // Key format: normalized team seo/name (lowercase, letters+numbers+hyphen).
-    // Value format: local logo filename (for example "Miami (Ohio).svg").
-    LOCAL_LOGO_OVERRIDES: {
+  // Team branding + logo behavior
+  teamBranding: {
+    localLogosEnabled: true,
+    preferLocalLogos: true,
+    localLogoCatalogPath: "/logos/catalog",
+    useRealLogos: true,
+    logoBaseUrl: "https://ncaa-api.henrygd.me/logo",
+    localLogoOverrides: {
       "miami-oh": "Miami (Ohio).svg",
       "miami-fl": "Miami.svg",
       illinois: "Illinois Fighting.svg",
@@ -551,58 +71,414 @@ export const CONFIG = {
       "illinois-fighting-illini": "Illinois Fighting.svg",
       "eastern-illinois": "Eastern Illinois.svg",
     },
-
-    // Remote NCAA logos remain as fallback for any team not found locally.
-    USE_REAL_LOGOS: true,
-    LOGO_BASE_URL: "https://ncaa-api.henrygd.me/logo",
   },
 
-  // Base weight by game status (higher means more important)
-  STATUS_WEIGHTS: QUICK_TUNE.statusWeights,
+  // ------------------- SCORING CHEAT SHEET -------------------
+  // Final score = status + team + conference + boosts - penalties
+  // Tune order:
+  // 1) statusWeights
+  // 2) bonusWeights / penaltyWeights
+  // 3) closeGameRules / blowoutRules
+  // 4) teamWeights / conferenceWeights
+  // 5) tipoffProximity / progressBoost / finalHold
+  scoring: {
+    statusWeights: {
+      LIVE: 1700,
+      UPCOMING: 650,
+      FINAL: 40,
+      UNKNOWN: 0,
+    },
 
-  // Conference preference weights
-  // Keys should use lowercase slugs like "big-ten" and "sec".
-  CONFERENCE_WEIGHTS: QUICK_TUNE.conferenceWeights,
+    conferenceWeights: {
+      "big-ten": 50,
+      sec: 50,
+      acc: 50,
+      "big-12": 50,
+      "big-east": 50,
+    },
 
-  // Team preference weights
-  // Keys use normalized team names (lowercase).
-  TEAM_WEIGHTS: QUICK_TUNE.teamWeights,
+    teamWeights: {
+      // Michigan stays strongly preferred, but final games are reduced by finalStatusMultiplier.
+      michigan: 2400,
+    },
 
-  TEAM_PREFERENCE_RULES: QUICK_TUNE.teamPreferenceRules,
+    teamPreferenceRules: {
+      // 0 removes preferred-team boost once game is FINAL.
+      finalStatusMultiplier: 0,
+    },
 
-  // Bonus weights for game situations
-  BONUS_WEIGHTS: QUICK_TUNE.bonusWeights,
+    bonusWeights: {
+      rankedGame: 240,
+      bothTeamsRanked: 320,
+      closeGame: 170,
+      closeLateGame: 520,
+    },
 
-  // Penalties for less-watchable situations.
-  PENALTY_WEIGHTS: QUICK_TUNE.penaltyWeights,
+    penaltyWeights: {
+      finalGame: 200,
+      liveBlowout: 260,
+      liveLowInterest: 180,
+    },
 
-  // Temporary boost for newly final games so they do not disappear immediately.
-  FINAL_HOLD: QUICK_TUNE.finalHold,
+    finalHold: {
+      enabled: true,
+      holdMinutes: 3,
+      maxBonus: 950,
+    },
 
-  CLOSE_GAME_RULES: QUICK_TUNE.closeGameRules,
+    closeGameRules: {
+      closeMargin: 8,
+      firstHalfCloseMultiplier: 0.15,
+      closeLateMargin: 8,
+      closeLateMinutesLeft: 5,
+    },
 
-  BLOWOUT_RULES: QUICK_TUNE.blowoutRules,
+    blowoutRules: {
+      blowoutMargin: 20,
+    },
 
-  UPCOMING_TIPOFF_PROXIMITY: QUICK_TUNE.upcomingTipoffProximity,
+    upcomingTipoffProximity: {
+      enabled: true,
+      horizonMinutes: 360,
+      maxBonus: 120,
+    },
 
-  DISPLAY: {
-    TIME_ZONE: "America/Chicago",
-    TIME_LABEL: "CT",
+    progressBoost: {
+      enabled: true,
+      maxClockProgressBonus: 350,
+      overtimeBonus: 120,
+    },
+
+    scoringDebug: {
+      enabled: false,
+      topGamesToLog: 12,
+    },
   },
 
-  // Controls how much extra importance to give LIVE games as they progress.
-  // This helps later games float above earlier games when other factors are similar.
-  PROGRESS_BOOST: QUICK_TUNE.progressBoost,
+  // March Madness rooting dots
+  // Dot appears only when that bracket picked that team for the game's round.
+  // No elimination check is applied: if the picked team is on the card for that round, dot shows.
+  bracketRooting: {
+    enabled: true,
+    brackets: [
+      {
+        id: "gimmie-dat-tschetter",
+        name: "Gimmie dat Tschetter",
+        color: "#ffd400",
+        picksByRound: {
+          "round-of-64": [
+            "Duke",
+            "TCU",
+            "UNI",
+            "Kansas",
+            "South Fla.",
+            "Michigan St.",
+            "UCLA",
+            "UConn",
+            "Arizona",
+            "Utah St.",
+            "Wisconsin",
+            "Arkansas",
+            "BYU",
+            "Gonzaga",
+            "Miami (FL)",
+            "Purdue",
+            "Florida",
+            "Iowa",
+            "Vanderbilt",
+            "Troy",
+            "VCU",
+            "Illinois",
+            "Saint Mary's (CA)",
+            "Houston",
+            "Michigan",
+            "Saint Louis",
+            "Texas Tech",
+            "Hofstra",
+            "Miami (OH)",
+            "Virginia",
+            "Santa Clara",
+            "Iowa St.",
+          ],
+          "round-of-32": [
+            "Duke",
+            "Kansas",
+            "South Fla.",
+            "UConn",
+            "Arizona",
+            "Arkansas",
+            "Gonzaga",
+            "Purdue",
+            "Florida",
+            "Vanderbilt",
+            "Illinois",
+            "Houston",
+            "Michigan",
+            "Texas Tech",
+            "Virginia",
+            "Iowa St.",
+          ],
+          "sweet-16": [
+            "Duke",
+            "UConn",
+            "Arizona",
+            "Gonzaga",
+            "Vanderbilt",
+            "Houston",
+            "Michigan",
+            "Virginia",
+          ],
+          "elite-8": ["Duke", "Arizona", "Houston", "Michigan"],
+          "final-four": ["Duke", "Michigan"],
+          championship: ["Michigan"],
+        },
+      },
+      {
+        id: "ozzy-bracket",
+        name: "Ozzy Bracket",
+        color: "#30d158",
+        picksByRound: {
+          "round-of-64": [
+            "Duke",
+            "Ohio St.",
+            "St. John's (NY)",
+            "California Baptist",
+            "Louisville",
+            "North Dakota St.",
+            "UCLA",
+            "UConn",
+            "Arizona",
+            "Villanova",
+            "Wisconsin",
+            "Hawaii",
+            "Texas",
+            "Gonzaga",
+            "Missouri",
+            "Purdue",
+            "Florida",
+            "Iowa",
+            "McNeese",
+            "Nebraska",
+            "North Carolina",
+            "Penn",
+            "Saint Mary's (CA)",
+            "Houston",
+            "Michigan",
+            "Georgia",
+            "Texas Tech",
+            "Hofstra",
+            "Tennessee",
+            "Virginia",
+            "Santa Clara",
+            "Iowa St.",
+          ],
+          "round-of-32": [
+            "Ohio St.",
+            "St. John's (NY)",
+            "Louisville",
+            "UCLA",
+            "Arizona",
+            "Wisconsin",
+            "Gonzaga",
+            "Purdue",
+            "Florida",
+            "Nebraska",
+            "Penn",
+            "Houston",
+            "Georgia",
+            "Hofstra",
+            "Tennessee",
+            "Iowa St.",
+          ],
+          "sweet-16": [
+            "St. John's (NY)",
+            "Louisville",
+            "Arizona",
+            "Purdue",
+            "Florida",
+            "Houston",
+            "Georgia",
+            "Tennessee",
+          ],
+          "elite-8": ["Louisville", "Arizona", "Florida", "Tennessee"],
+          "final-four": ["Florida", "Tennessee"],
+          championship: ["Florida"],
+        },
+      },
+      {
+        id: "melina-bracket",
+        name: "Melina Bracket",
+        color: "#ff6b6b",
+        picksByRound: {
+          "round-of-64": [
+            "Duke",
+            "Ohio St.",
+            "St. John's (NY)",
+            "Kansas",
+            "Louisville",
+            "Michigan St.",
+            "UCLA",
+            "UConn",
+            "Arizona",
+            "Utah St.",
+            "Wisconsin",
+            "Arkansas",
+            "BYU",
+            "Gonzaga",
+            "Miami (FL)",
+            "Purdue",
+            "Florida",
+            "Iowa",
+            "Vanderbilt",
+            "Nebraska",
+            "North Carolina",
+            "Illinois",
+            "Texas A&M",
+            "Houston",
+            "Michigan",
+            "Georgia",
+            "Texas Tech",
+            "Alabama",
+            "Tennessee",
+            "Virginia",
+            "Kentucky",
+            "Iowa St.",
+          ],
+          "round-of-32": [
+            "Duke",
+            "Kansas",
+            "Michigan St.",
+            "UCLA",
+            "Arizona",
+            "Wisconsin",
+            "Gonzaga",
+            "Purdue",
+            "Florida",
+            "Nebraska",
+            "Illinois",
+            "Houston",
+            "Michigan",
+            "Alabama",
+            "Virginia",
+            "Iowa St.",
+          ],
+          "sweet-16": [
+            "Duke",
+            "Michigan St.",
+            "Arizona",
+            "Gonzaga",
+            "Florida",
+            "Illinois",
+            "Michigan",
+            "Virginia",
+          ],
+          "elite-8": ["Duke", "Arizona", "Illinois", "Michigan"],
+          "final-four": ["Duke", "Michigan"],
+          championship: ["Michigan"],
+        },
+      },
+      {
+        id: "overthinking-it-bracket",
+        name: "Overthinking It Bracket",
+        color: "#66b3ff",
+        picksByRound: {
+          "round-of-64": [
+            "Duke",
+            "TCU",
+            "St. John's (NY)",
+            "Kansas",
+            "South Fla.",
+            "Michigan St.",
+            "UCLA",
+            "UConn",
+            "Arizona",
+            "Utah St.",
+            "Wisconsin",
+            "Arkansas",
+            "Texas",
+            "Gonzaga",
+            "Missouri",
+            "Purdue",
+            "Florida",
+            "Iowa",
+            "Vanderbilt",
+            "Nebraska",
+            "VCU",
+            "Illinois",
+            "Texas A&M",
+            "Houston",
+            "Michigan",
+            "Saint Louis",
+            "Akron",
+            "Hofstra",
+            "Tennessee",
+            "Virginia",
+            "Santa Clara",
+            "Iowa St.",
+          ],
+          "round-of-32": [
+            "Duke",
+            "St. John's (NY)",
+            "Michigan St.",
+            "UCLA",
+            "Arizona",
+            "Wisconsin",
+            "Gonzaga",
+            "Missouri",
+            "Florida",
+            "Vanderbilt",
+            "Illinois",
+            "Houston",
+            "Michigan",
+            "Hofstra",
+            "Virginia",
+            "Iowa St.",
+          ],
+          "sweet-16": [
+            "Duke",
+            "Michigan St.",
+            "Arizona",
+            "Gonzaga",
+            "Florida",
+            "Houston",
+            "Michigan",
+            "Iowa St.",
+          ],
+          "elite-8": ["Duke", "Arizona", "Florida", "Iowa St."],
+          "final-four": ["Duke", "Arizona"],
+          championship: ["Arizona"],
+        },
+      },
+    ],
+    roundAliases: {
+      "first-round": "round-of-64",
+      "second-round": "round-of-32",
+      "round-of-64": "round-of-64",
+      "round-of-32": "round-of-32",
+      "sweet-16": "sweet-16",
+      "regional-semifinal": "sweet-16",
+      "elite-8": "elite-8",
+      "regional-final": "elite-8",
+      "final-four": "final-four",
+      "national-semifinal": "final-four",
+      championship: "championship",
+      "national-championship": "championship",
+      "title-game": "championship",
+    },
+  },
+};
 
-  // Optional console logging to help tune weights.
-  // Set enabled: true, then open browser DevTools console.
-  SCORING_DEBUG: {
-    enabled: false,
-    topGamesToLog: 12,
+// ============================================================
+// ADVANCED_DEFAULTS (RARELY EDIT)
+// ============================================================
+const ADVANCED_DEFAULTS = {
+  api: {
+    sport: "basketball-men",
+    divisionPath: "d1",
+    requestTimeoutMs: 8000,
   },
 
-  // Used when the API only gives conference SEO slugs.
-  CONFERENCE_NAME_MAP: {
+  conferenceNameMap: {
     acc: "ACC",
     american: "American",
     "atlantic-10": "Atlantic 10",
@@ -619,12 +495,89 @@ export const CONFIG = {
     wac: "WAC",
   },
 
-  UI_TEXT: {
+  uiText: {
     loading: "Loading today's games...",
     empty: "No games were found for today.",
     fetchError:
       "We could not load NCAA game data right now. The dashboard will keep trying automatically.",
   },
+};
+
+export const CONFIG = {
+  API: {
+    BASE_URL: buildLocalServerUrl("/api"),
+    SPORT: ADVANCED_DEFAULTS.api.sport,
+    DIVISION_PATH: ADVANCED_DEFAULTS.api.divisionPath,
+    REQUEST_TIMEOUT_MS: ADVANCED_DEFAULTS.api.requestTimeoutMs,
+    REFRESH_INTERVAL_MS: USER_SETTINGS.refreshIntervalSeconds * 1000,
+  },
+
+  SETTINGS_SYNC: {
+    enabled: true,
+    pollIntervalMs: USER_SETTINGS.settingsSyncSeconds * 1000,
+  },
+
+  CLOCK_INTERVAL_MS: USER_SETTINGS.clockIntervalMs,
+
+  TV_LAYOUT: {
+    enabled: USER_SETTINGS.layout.enabled,
+    autoGridFromMaxVisible: USER_SETTINGS.layout.autoGridFromMaxVisible,
+    gapPx: USER_SETTINGS.layout.gapPx,
+    outerPaddingPx: USER_SETTINGS.layout.outerPaddingPx,
+    tickerHeightPx: USER_SETTINGS.layout.tickerHeightPx,
+    targetCardAspectRatio: USER_SETTINGS.layout.targetCardAspectRatio,
+    maxVisibleGames: USER_SETTINGS.layout.columns * USER_SETTINGS.layout.rows,
+    columns: USER_SETTINGS.layout.columns,
+    rows: USER_SETTINGS.layout.rows,
+  },
+
+  TICKER: {
+    enabled: USER_SETTINGS.ticker.enabled,
+    cycleIntervalMs: USER_SETTINGS.ticker.cycleIntervalMs,
+  },
+
+  BOTTOM_ROW_ROTATOR: {
+    enabled: USER_SETTINGS.rotatingBottomRow.enabled,
+    cycleIntervalMs: USER_SETTINGS.rotatingBottomRow.cycleSeconds * 1000,
+    fadeMs: USER_SETTINGS.rotatingBottomRow.fadeMs,
+  },
+
+  TEAM_BRANDING: {
+    LOCAL_LOGOS_ENABLED: USER_SETTINGS.teamBranding.localLogosEnabled,
+    PREFER_LOCAL_LOGOS: USER_SETTINGS.teamBranding.preferLocalLogos,
+    LOCAL_LOGO_CATALOG_URL: buildLocalServerUrl(USER_SETTINGS.teamBranding.localLogoCatalogPath),
+    LOCAL_LOGO_OVERRIDES: USER_SETTINGS.teamBranding.localLogoOverrides,
+    USE_REAL_LOGOS: USER_SETTINGS.teamBranding.useRealLogos,
+    LOGO_BASE_URL: USER_SETTINGS.teamBranding.logoBaseUrl,
+  },
+
+  STATUS_WEIGHTS: USER_SETTINGS.scoring.statusWeights,
+  CONFERENCE_WEIGHTS: USER_SETTINGS.scoring.conferenceWeights,
+  TEAM_WEIGHTS: USER_SETTINGS.scoring.teamWeights,
+  TEAM_PREFERENCE_RULES: USER_SETTINGS.scoring.teamPreferenceRules,
+  BONUS_WEIGHTS: USER_SETTINGS.scoring.bonusWeights,
+  PENALTY_WEIGHTS: USER_SETTINGS.scoring.penaltyWeights,
+  FINAL_HOLD: USER_SETTINGS.scoring.finalHold,
+  CLOSE_GAME_RULES: USER_SETTINGS.scoring.closeGameRules,
+  BLOWOUT_RULES: USER_SETTINGS.scoring.blowoutRules,
+  UPCOMING_TIPOFF_PROXIMITY: USER_SETTINGS.scoring.upcomingTipoffProximity,
+  PROGRESS_BOOST: USER_SETTINGS.scoring.progressBoost,
+  SCORING_DEBUG: USER_SETTINGS.scoring.scoringDebug,
+
+  DISPLAY: {
+    TIME_ZONE: USER_SETTINGS.display.timeZone,
+    TIME_LABEL: USER_SETTINGS.display.timeLabel,
+  },
+
+  GAME_FILTERS: {
+    marchMadnessOnly: USER_SETTINGS.gameFilters.marchMadnessOnly,
+    marchMadnessChampionshipIds: USER_SETTINGS.gameFilters.marchMadnessChampionshipIds,
+  },
+
+  BRACKET_ROOTING: USER_SETTINGS.bracketRooting,
+
+  CONFERENCE_NAME_MAP: ADVANCED_DEFAULTS.conferenceNameMap,
+  UI_TEXT: ADVANCED_DEFAULTS.uiText,
 };
 
 /**
@@ -695,3 +648,45 @@ export async function loadConfigOverridesFromServer() {
     return false;
   }
 }
+
+// ------------------------------------------------------------
+// Internal helpers
+// ------------------------------------------------------------
+
+function buildLocalServerUrl(path) {
+  const safePath = String(path ?? "").startsWith("/") ? path : `/${path}`;
+
+  if (typeof window === "undefined") {
+    return `http://localhost:${SETTINGS_SERVER_PORT}${safePath}`;
+  }
+
+  const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+  const host = window.location.hostname || "localhost";
+  return `${protocol}//${host}:${SETTINGS_SERVER_PORT}${safePath}`;
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function deepMergeMutable(target, source) {
+  if (!isPlainObject(target) || !isPlainObject(source)) {
+    return target;
+  }
+
+  Object.keys(source).forEach((key) => {
+    const sourceValue = source[key];
+    const targetValue = target[key];
+
+    if (isPlainObject(sourceValue) && isPlainObject(targetValue)) {
+      deepMergeMutable(targetValue, sourceValue);
+      return;
+    }
+
+    target[key] = sourceValue;
+  });
+
+  return target;
+}
+
+

@@ -33,7 +33,7 @@ body {
 .settings-page {
   max-width: 980px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 14px;
 }
 
 .settings-header h1 {
@@ -78,7 +78,7 @@ body {
 
 .settings-form {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   margin-top: 12px;
 }
 
@@ -93,6 +93,59 @@ body {
   margin: 0 0 10px;
   font-size: 1.1rem;
   color: var(--accent-warm);
+}
+
+.settings-accordion {
+  padding: 0;
+  overflow: hidden;
+}
+
+.settings-accordion__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 11px 12px;
+  display: grid;
+  gap: 3px;
+  border-bottom: 1px solid transparent;
+  position: relative;
+}
+
+.settings-accordion__summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-accordion__summary::after {
+  content: "▾";
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  color: #cdd9ef;
+  font-size: 0.9rem;
+  transition: transform 0.18s ease;
+}
+
+.settings-accordion[open] .settings-accordion__summary::after {
+  transform: rotate(180deg);
+}
+
+.settings-accordion[open] .settings-accordion__summary {
+  border-bottom-color: rgba(191, 191, 191, 0.2);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.settings-accordion__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent-warm);
+}
+
+.settings-accordion__hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.settings-accordion__content {
+  padding: 11px 12px 12px;
 }
 
 .settings-card--guide {
@@ -124,7 +177,7 @@ body {
 
 .field-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 10px;
 }
 
@@ -142,6 +195,7 @@ label {
 }
 
 input[type="number"],
+input[type="text"],
 select,
 textarea {
   width: 100%;
@@ -149,16 +203,10 @@ textarea {
   border: 1px solid var(--line);
   background: #141414;
   color: var(--text-main);
-  padding: 8px 10px;
+  padding: 10px 12px;
   font-family: inherit;
-  font-size: 0.95rem;
-}
-
-.preset-controls {
-  display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto;
-  align-items: end;
-  gap: 10px;
+  font-size: 1rem;
+  min-height: 42px;
 }
 
 textarea {
@@ -175,8 +223,8 @@ textarea {
 }
 
 .checkbox-field input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   accent-color: var(--accent);
 }
 
@@ -184,6 +232,17 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.settings-actions--sticky {
+  position: sticky;
+  bottom: 8px;
+  z-index: 12;
+  border: 1px solid rgba(191, 191, 191, 0.22);
+  border-radius: 12px;
+  background: rgba(20, 20, 20, 0.95);
+  backdrop-filter: blur(3px);
+  padding: 10px;
 }
 
 .btn {
@@ -195,6 +254,7 @@ textarea {
   font-size: 0.95rem;
   text-decoration: none;
   cursor: pointer;
+  min-height: 42px;
 }
 
 .btn--primary {
@@ -214,11 +274,17 @@ textarea {
     padding: 12px;
   }
 
-  .settings-card {
-    padding: 10px;
+  .field-grid {
+    grid-template-columns: 1fr;
   }
 
-  .preset-controls {
-    grid-template-columns: 1fr;
+  .settings-actions {
+    flex-direction: column;
+  }
+
+  .btn,
+  .btn--link {
+    width: 100%;
+    justify-content: center;
   }
 }

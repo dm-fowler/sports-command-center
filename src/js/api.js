@@ -72,6 +72,7 @@ function normalizeGame(rawGame, localLogoCatalog, rankingsMap, standingsMap) {
   const status = normalizeStatus(rawGame.gameState);
   const statusDetail =
     safeText(rawGame.finalMessage, null) || safeText(rawGame.currentPeriod, null);
+  const tournamentRound = parseTournamentRound(rawGame);
 
   return {
     id: String(rawGame.gameID),
@@ -81,7 +82,9 @@ function normalizeGame(rawGame, localLogoCatalog, rankingsMap, standingsMap) {
     startTime: safeText(rawGame.startTime, null),
     startTimeEpoch: toNumber(rawGame.startTimeEpoch, null),
     network: safeText(rawGame.network, null),
-    tournamentRound: safeText(rawGame.bracketRound, null),
+    championshipId: parsePositiveInteger(rawGame.championshipId),
+    bracketId: parsePositiveInteger(rawGame.bracketId),
+    tournamentRound,
     region: safeText(rawGame.bracketRegion, null),
     awayTeam: normalizeTeam(rawGame.away, localLogoCatalog, rankingsMap, standingsMap),
     homeTeam: normalizeTeam(rawGame.home, localLogoCatalog, rankingsMap, standingsMap),
@@ -125,6 +128,7 @@ function normalizeTeam(rawTeam, localLogoCatalog, rankingsMap, standingsMap) {
     seo,
     logoUrl,
     logoUrls,
+    seed: parseSeed(rawTeam?.seed),
     rank: parseTeamRank(rawTeam, names, rankingsMap),
     conference: normalizeConference(rawTeam?.conferences),
     score: parseScore(rawTeam?.score),
@@ -858,6 +862,46 @@ function normalizeStatus(rawState) {
 function parseRank(rawRank) {
   const rank = toNumber(rawRank, null);
   return Number.isInteger(rank) && rank > 0 ? rank : null;
+}
+
+/**
+ * Parse tournament seed into a positive integer, or null when missing.
+ */
+function parseSeed(rawSeed) {
+  const seed = toNumber(rawSeed, null);
+  return Number.isInteger(seed) && seed > 0 ? seed : null;
+}
+
+/**
+ * Parse positive integer-like fields (for example bracket/championship ids).
+ * Returns null when empty/invalid.
+ */
+function parsePositiveInteger(value) {
+  const parsed = toNumber(value, null);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+/**
+ * Build a stable tournament round label.
+ * Uses championship round title first, then bracketRound fallback.
+ */
+function parseTournamentRound(rawGame) {
+  const title = safeText(rawGame?.championshipGame?.round?.title, null);
+  if (title) {
+    return title;
+  }
+
+  const roundText = safeText(rawGame?.bracketRound, null);
+  if (roundText) {
+    return roundText;
+  }
+
+  const roundNumber = parsePositiveInteger(rawGame?.bracketRound);
+  if (roundNumber) {
+    return `Round ${roundNumber}`;
+  }
+
+  return null;
 }
 
 /**

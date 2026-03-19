@@ -16,6 +16,7 @@ import {
   updateLastUpdated,
   updateRefreshIntervalLabel,
 } from "./render.js";
+import { annotateGamesWithBracketRooting } from "./rooting.js";
 import { scoreGames, sortGamesByImportance } from "./scoring.js";
 
 let isRefreshing = false;
@@ -56,7 +57,9 @@ async function refreshDashboard() {
 
     const games = await fetchTodaysGames();
     const gamesWithFinalTiming = annotateFinalTiming(games);
-    const scoredGames = scoreGames(gamesWithFinalTiming);
+    const filteredGames = applyGameFilters(gamesWithFinalTiming);
+    const rootingResult = annotateGamesWithBracketRooting(filteredGames);
+    const scoredGames = scoreGames(rootingResult.games);
     const sortedGames = sortGamesByImportance(scoredGames);
     maybeLogScoringSnapshot(sortedGames);
     latestSortedGames = sortedGames;
@@ -166,6 +169,10 @@ function buildRenderSignature(games) {
         game.statusDetail ?? "",
         game.clock ?? "",
         game.startTime ?? "",
+        game.tournamentRound ?? "",
+        game.rootingRoundKey ?? "",
+        (game.rootingDots?.away ?? []).map((dot) => `${dot.id}:${dot.color}`).join(","),
+        (game.rootingDots?.home ?? []).map((dot) => `${dot.id}:${dot.color}`).join(","),
         game.awayTeam?.score ?? "",
         game.homeTeam?.score ?? "",
       ].join("|");
@@ -684,6 +691,41 @@ function getPositiveNumber(value, fallback) {
   }
 
   return fallback;
+}
+
+function applyGameFilters(games) {
+  const filters = CONFIG.GAME_FILTERS;
+
+  if (!filters?.marchMadnessOnly) {
+    return games;
+  }
+
+  const allowedChampionshipIds = Array.isArray(filters.marchMadnessChampionshipIds)
+    ? filters.marchMadnessChampionshipIds
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    : [];
+
+  return games.filter((game) => {
+    const hasRound = Boolean(game?.tournamentRound);
+    const hasBracketId = Number.isInteger(game?.bracketId) && game.bracketId > 0;
+    const hasChampionshipId = Number.isInteger(game?.championshipId) && game.championshipId > 0;
+    const hasSeeds =
+      Number.isInteger(game?.awayTeam?.seed) &&
+      game.awayTeam.seed > 0 &&
+      Number.isInteger(game?.homeTeam?.seed) &&
+      game.homeTeam.seed > 0;
+
+    const championshipId = Number(game?.championshipId);
+    const championshipMatches =
+      allowedChampionshipIds.length === 0
+        ? true
+        : Number.isInteger(championshipId) && allowedChampionshipIds.includes(championshipId);
+
+    const hasTournamentMarkers = hasRound || hasBracketId || hasChampionshipId;
+
+    return hasTournamentMarkers && hasSeeds && championshipMatches;
+  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {

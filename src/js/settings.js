@@ -4,19 +4,15 @@
 // Saves override JSON to the local server so dashboard can load it.
 // ------------------------------------------------------------
 
-import { CONFIG, WEIGHT_PRESETS, getSettingsServerBaseUrl } from "./config.js";
+import { CONFIG, getSettingsServerBaseUrl } from "./config.js";
 
 const settingsBaseUrl = getSettingsServerBaseUrl();
 const form = document.getElementById("settingsForm");
 const resetButton = document.getElementById("resetButton");
 const statusMessage = document.getElementById("statusMessage");
 const settingsServerUrl = document.getElementById("settingsServerUrl");
-const weightPresetSelect = document.getElementById("weightPresetSelect");
-const applyPresetButton = document.getElementById("applyPresetButton");
-const weightPresetDescription = document.getElementById("weightPresetDescription");
 
 let resolvedConfig = deepClone(CONFIG);
-const presetMap = new Map(WEIGHT_PRESETS.map((preset) => [preset.id, preset]));
 
 init();
 
@@ -24,8 +20,6 @@ async function init() {
   if (settingsServerUrl) {
     settingsServerUrl.textContent = settingsBaseUrl;
   }
-
-  initializePresetControls();
 
   try {
     const overrides = await fetchSavedOverrides();
@@ -40,8 +34,6 @@ async function init() {
 
   form?.addEventListener("submit", onSaveSettings);
   resetButton?.addEventListener("click", onResetOverrides);
-  applyPresetButton?.addEventListener("click", onApplyPreset);
-  weightPresetSelect?.addEventListener("change", updatePresetDescription);
 }
 
 async function onSaveSettings(event) {
@@ -67,26 +59,10 @@ async function onResetOverrides() {
 
     resolvedConfig = deepClone(CONFIG);
     populateFormFromConfig(resolvedConfig);
-    setPresetSelection("custom-current");
     showMessage("Overrides reset. Dashboard will use config.js defaults.", "info");
   } catch (error) {
     showMessage(`Reset failed: ${error.message}`, "error");
   }
-}
-
-function onApplyPreset() {
-  const preset = getSelectedPreset();
-
-  if (!preset) {
-    showMessage("Please choose a valid preset before loading.", "error");
-    return;
-  }
-
-  // Merge preset into current config so non-weight settings remain unchanged.
-  resolvedConfig = deepMerge(deepClone(resolvedConfig), deepClone(preset.overrides));
-  populateFormFromConfig(resolvedConfig);
-
-  showMessage(`Loaded preset: ${preset.label}. Click Save Settings to apply it.`, "info");
 }
 
 async function fetchSavedOverrides() {
@@ -125,57 +101,6 @@ async function saveOverrides(overrides) {
   }
 }
 
-function initializePresetControls() {
-  if (!weightPresetSelect) {
-    return;
-  }
-
-  weightPresetSelect.innerHTML = "";
-
-  WEIGHT_PRESETS.forEach((preset) => {
-    const option = document.createElement("option");
-    option.value = preset.id;
-    option.textContent = preset.label;
-    weightPresetSelect.append(option);
-  });
-
-  setPresetSelection("custom-current");
-}
-
-function setPresetSelection(presetId) {
-  if (!weightPresetSelect) {
-    return;
-  }
-
-  const optionExists = Array.from(weightPresetSelect.options).some((option) => option.value === presetId);
-
-  if (!optionExists) {
-    return;
-  }
-
-  weightPresetSelect.value = presetId;
-  updatePresetDescription();
-}
-
-function getSelectedPreset() {
-  if (!weightPresetSelect) {
-    return null;
-  }
-
-  return presetMap.get(weightPresetSelect.value) ?? null;
-}
-
-function updatePresetDescription() {
-  if (!weightPresetDescription) {
-    return;
-  }
-
-  const preset = getSelectedPreset();
-  weightPresetDescription.textContent = preset
-    ? preset.description
-    : "Pick a preset to see details.";
-}
-
 function populateFormFromConfig(config) {
   setNumber("refreshIntervalSeconds", Math.round(config.API.REFRESH_INTERVAL_MS / 1000));
   setNumber("tickerCycleSeconds", Math.round(config.TICKER.cycleIntervalMs / 1000));
@@ -184,6 +109,7 @@ function populateFormFromConfig(config) {
   setNumber("bottomRowRotatorFadeMs", config.BOTTOM_ROW_ROTATOR.fadeMs);
   setNumber("gridColumns", config.TV_LAYOUT.columns);
   setNumber("gridRows", config.TV_LAYOUT.rows);
+  setChecked("marchMadnessOnly", config.GAME_FILTERS?.marchMadnessOnly);
 
   setNumber("statusLive", config.STATUS_WEIGHTS.LIVE);
   setNumber("statusUpcoming", config.STATUS_WEIGHTS.UPCOMING);
@@ -220,11 +146,17 @@ function populateFormFromConfig(config) {
 
   setText("teamWeightsJson", JSON.stringify(config.TEAM_WEIGHTS, null, 2));
   setText("conferenceWeightsJson", JSON.stringify(config.CONFERENCE_WEIGHTS, null, 2));
+  setChecked("bracketRootingEnabled", config.BRACKET_ROOTING?.enabled);
+  setText(
+    "bracketRootingBracketsJson",
+    JSON.stringify(config.BRACKET_ROOTING?.brackets ?? [], null, 2)
+  );
 }
 
 function buildOverridesFromForm() {
   const teamWeights = parseJsonObject("teamWeightsJson", "Team Weights");
   const conferenceWeights = parseJsonObject("conferenceWeightsJson", "Conference Weights");
+  const bracketRootingBrackets = parseJsonArray("bracketRootingBracketsJson", "Brackets");
 
   const columns = readNumber("gridColumns", { integer: true, min: 1, fallback: 4 });
   const rows = readNumber("gridRows", { integer: true, min: 1, fallback: 4 });
@@ -264,6 +196,10 @@ function buildOverridesFromForm() {
       columns,
       rows,
       maxVisibleGames: columns * rows,
+    },
+    GAME_FILTERS: {
+      marchMadnessOnly: readChecked("marchMadnessOnly"),
+      marchMadnessChampionshipIds: resolvedConfig.GAME_FILTERS?.marchMadnessChampionshipIds ?? [],
     },
     STATUS_WEIGHTS: {
       LIVE: readNumber("statusLive", { integer: true, fallback: resolvedConfig.STATUS_WEIGHTS.LIVE }),
@@ -377,6 +313,11 @@ function buildOverridesFromForm() {
     },
     TEAM_WEIGHTS: teamWeights,
     CONFERENCE_WEIGHTS: conferenceWeights,
+    BRACKET_ROOTING: {
+      enabled: readChecked("bracketRootingEnabled"),
+      brackets: bracketRootingBrackets,
+      roundAliases: resolvedConfig.BRACKET_ROOTING?.roundAliases ?? {},
+    },
   };
 }
 
@@ -446,6 +387,29 @@ function parseJsonObject(id, label) {
 
   if (!isPlainObject(parsed)) {
     throw new Error(`${label} must be a JSON object.`);
+  }
+
+  return parsed;
+}
+
+function parseJsonArray(id, label) {
+  const element = document.getElementById(id);
+  const rawText = String(element?.value ?? "").trim();
+
+  if (!rawText) {
+    return [];
+  }
+
+  let parsed;
+
+  try {
+    parsed = JSON.parse(rawText);
+  } catch (error) {
+    throw new Error(`${label} must be valid JSON.`);
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error(`${label} must be a JSON array.`);
   }
 
   return parsed;

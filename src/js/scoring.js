@@ -51,6 +51,7 @@ export function sortGamesByImportance(scoredGames) {
 export function calculateImportanceScore(game) {
   let total = 0;
   const components = [];
+  const useMarchMadnessSimplifiedScoring = isMarchMadnessOnlyMode();
 
   const flags = {
     isRankedGame: false,
@@ -65,13 +66,15 @@ export function calculateImportanceScore(game) {
   const statusWeight = getStatusWeight(game.status);
   addComponent("status", statusWeight);
 
-  const teamWeight = getTeamPreferenceWeight(game);
-  addComponent("preferredTeam", teamWeight);
-  flags.hasPreferredTeam = teamWeight > 0;
+  if (!useMarchMadnessSimplifiedScoring) {
+    const teamWeight = getTeamPreferenceWeight(game);
+    addComponent("preferredTeam", teamWeight);
+    flags.hasPreferredTeam = teamWeight > 0;
 
-  const conferenceWeight = getConferencePreferenceWeight(game);
-  addComponent("preferredConference", conferenceWeight);
-  flags.hasPreferredConference = conferenceWeight > 0;
+    const conferenceWeight = getConferencePreferenceWeight(game);
+    addComponent("preferredConference", conferenceWeight);
+    flags.hasPreferredConference = conferenceWeight > 0;
+  }
 
   const liveProgressWeight = getLiveProgressWeight(game);
   addComponent("liveProgress", liveProgressWeight);
@@ -82,19 +85,26 @@ export function calculateImportanceScore(game) {
   const recentFinalHoldWeight = getRecentFinalHoldBonus(game);
   addComponent("recentFinalHold", recentFinalHoldWeight);
 
-  const bonusRules = [
-    {
-      key: "rankedGame",
-      isActive: () => isRankedGame(game),
-      value: () => CONFIG.BONUS_WEIGHTS.rankedGame,
-      flag: "isRankedGame",
-    },
-    {
-      key: "bothTeamsRanked",
-      isActive: () => bothTeamsRanked(game),
-      value: () => CONFIG.BONUS_WEIGHTS.bothTeamsRanked,
-      flag: "bothTeamsRanked",
-    },
+  const bonusRules = [];
+
+  if (!useMarchMadnessSimplifiedScoring) {
+    bonusRules.push(
+      {
+        key: "rankedGame",
+        isActive: () => isRankedGame(game),
+        value: () => CONFIG.BONUS_WEIGHTS.rankedGame,
+        flag: "isRankedGame",
+      },
+      {
+        key: "bothTeamsRanked",
+        isActive: () => bothTeamsRanked(game),
+        value: () => CONFIG.BONUS_WEIGHTS.bothTeamsRanked,
+        flag: "bothTeamsRanked",
+      }
+    );
+  }
+
+  bonusRules.push(
     {
       key: "closeGame",
       isActive: () => isCloseGame(game),
@@ -106,8 +116,8 @@ export function calculateImportanceScore(game) {
       isActive: () => isCloseLateGame(game),
       value: () => CONFIG.BONUS_WEIGHTS.closeLateGame,
       flag: "isCloseLateGame",
-    },
-  ];
+    }
+  );
 
   bonusRules.forEach((rule) => {
     if (rule.isActive()) {
@@ -128,12 +138,15 @@ export function calculateImportanceScore(game) {
       isActive: () => isLiveBlowout(game),
       value: () => CONFIG.PENALTY_WEIGHTS.liveBlowout,
     },
-    {
+  ];
+
+  if (!useMarchMadnessSimplifiedScoring) {
+    penaltyRules.push({
       key: "liveLowInterestPenalty",
       isActive: () => isLowInterestLiveGame(game),
       value: () => CONFIG.PENALTY_WEIGHTS.liveLowInterest,
-    },
-  ];
+    });
+  }
 
   penaltyRules.forEach((rule) => {
     if (rule.isActive()) {
@@ -331,10 +344,18 @@ function normalizeConferenceKey(conference) {
 }
 
 function isRankedGame(game) {
+  if (!isRankBasedScoringEnabled()) {
+    return false;
+  }
+
   return hasRank(game.awayTeam) || hasRank(game.homeTeam);
 }
 
 function bothTeamsRanked(game) {
+  if (!isRankBasedScoringEnabled()) {
+    return false;
+  }
+
   return hasRank(game.awayTeam) && hasRank(game.homeTeam);
 }
 
@@ -550,4 +571,12 @@ function parseClockToSeconds(clockText) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function isRankBasedScoringEnabled() {
+  return !isMarchMadnessOnlyMode();
+}
+
+function isMarchMadnessOnlyMode() {
+  return Boolean(CONFIG.GAME_FILTERS?.marchMadnessOnly);
 }

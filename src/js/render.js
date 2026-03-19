@@ -394,8 +394,8 @@ function updateGameCard(card, game) {
   refs.footerMeta.network.textContent = safeText(game.network, "Network TBD");
   refs.footerMeta.tournament.textContent = buildTournamentText(game);
 
-  updateTeamRow(refs.awayTeam, game.awayTeam, game.status);
-  updateTeamRow(refs.homeTeam, game.homeTeam, game.status);
+  updateTeamRow(refs.awayTeam, game.awayTeam, game.status, game.rootingDots?.away ?? []);
+  updateTeamRow(refs.homeTeam, game.homeTeam, game.status, game.rootingDots?.home ?? []);
 
   if (game.importanceFlags?.isCloseLateGame) {
     card.classList.add("game-card--close-late");
@@ -529,8 +529,11 @@ function createTeamRow() {
   nameMain.className = "team-name__main";
   const nameRecord = document.createElement("span");
   nameRecord.className = "team-name__record team-name__record--hidden";
+  const nameDots = document.createElement("span");
+  nameDots.className = "team-name__dots team-name__dots--hidden";
   name.appendChild(nameMain);
   name.appendChild(nameRecord);
+  name.appendChild(nameDots);
 
   const info = document.createElement("p");
   info.className = "team-info";
@@ -553,21 +556,23 @@ function createTeamRow() {
     name,
     nameMain,
     nameRecord,
+    nameDots,
     info,
     score,
   };
 }
 
-function updateTeamRow(teamRowRefs, team, gameStatus) {
+function updateTeamRow(teamRowRefs, team, gameStatus, rootingDots = []) {
   updateTeamLogo(teamRowRefs, team);
   teamRowRefs.logoFallback.textContent = getTeamInitials(team.name);
-  teamRowRefs.nameMain.textContent = hasRank(team) ? `#${team.rank} ${team.name}` : team.name;
+  teamRowRefs.nameMain.textContent = getTeamDisplayName(team);
   teamRowRefs.nameRecord.textContent = team.record ? `(${team.record})` : "";
   if (team.record) {
     teamRowRefs.nameRecord.classList.remove("team-name__record--hidden");
   } else {
     teamRowRefs.nameRecord.classList.add("team-name__record--hidden");
   }
+  renderTeamRootingDots(teamRowRefs, rootingDots);
   teamRowRefs.info.textContent = "";
   teamRowRefs.info.classList.add("team-info--hidden");
 
@@ -580,6 +585,46 @@ function updateTeamRow(teamRowRefs, team, gameStatus) {
 
   teamRowRefs.score.classList.remove("team-score--hidden");
   teamRowRefs.score.textContent = formatScore(team.score);
+}
+
+function renderTeamRootingDots(teamRowRefs, rootingDots) {
+  const container = teamRowRefs.nameDots;
+  container.replaceChildren();
+
+  const dots = Array.isArray(rootingDots) ? rootingDots : [];
+
+  if (dots.length === 0) {
+    container.classList.add("team-name__dots--hidden");
+    return;
+  }
+
+  dots.forEach((dotData) => {
+    const dot = document.createElement("span");
+    dot.className = "team-name__dot";
+    dot.style.backgroundColor = safeText(dotData?.color, "#9fb1d3");
+    dot.title = safeText(dotData?.name, "Bracket pick");
+    dot.setAttribute("aria-label", safeText(dotData?.name, "Bracket pick"));
+    container.appendChild(dot);
+  });
+
+  container.classList.remove("team-name__dots--hidden");
+}
+
+function getTeamDisplayName(team) {
+  const teamName = safeText(team?.name, "Unknown Team");
+  const marchMadnessMode = Boolean(CONFIG.GAME_FILTERS?.marchMadnessOnly);
+  const seed = Number(team?.seed);
+
+  // In March Madness mode, show seed instead of AP rank.
+  if (marchMadnessMode && Number.isInteger(seed) && seed > 0) {
+    return `${seed} ${teamName}`;
+  }
+
+  if (hasRank(team)) {
+    return `#${team.rank} ${teamName}`;
+  }
+
+  return teamName;
 }
 
 function updateTeamLogo(teamRowRefs, team) {
@@ -712,16 +757,21 @@ function buildCardRenderSignature(game) {
     game.region ?? "",
     game.awayTeam?.name ?? "",
     game.awayTeam?.rank ?? "",
+    game.awayTeam?.seed ?? "",
     game.awayTeam?.record ?? "",
     game.awayTeam?.score ?? "",
     game.awayTeam?.logoUrl ?? "",
     safeLogoList,
     game.homeTeam?.name ?? "",
     game.homeTeam?.rank ?? "",
+    game.homeTeam?.seed ?? "",
     game.homeTeam?.record ?? "",
     game.homeTeam?.score ?? "",
     game.homeTeam?.logoUrl ?? "",
     safeHomeLogoList,
+    (game.rootingDots?.away ?? []).map((dot) => `${dot.id}:${dot.color}`).join(","),
+    (game.rootingDots?.home ?? []).map((dot) => `${dot.id}:${dot.color}`).join(","),
+    CONFIG.GAME_FILTERS?.marchMadnessOnly ? "1" : "0",
     game.importanceFlags?.isCloseLateGame ? "1" : "0",
     game.uiMeta?.isBottomRowRotatorSlot ? "1" : "0",
     game.uiMeta?.fadeInBottomRow ? "1" : "0",
